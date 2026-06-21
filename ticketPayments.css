@@ -1,0 +1,67 @@
+/* ticket.css - estilo de vista previa y ticket para impresión */
+
+#ticket-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+#ticket-modal.hidden { display: none; }
+
+#ticket-preview {
+  width: 320px;
+  background: white;
+  padding: 20px;
+  border-radius: 6px;
+  font-family: "Courier New", monospace;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.ticket-header {
+  text-align: center;
+  margin-bottom: 16px;
+  border-bottom: 1px dashed #aaa;
+  padding-bottom: 10px;
+}
+
+.ticket-items {
+  border-bottom: 1px dashed #aaa;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.ticket-items .row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+}
+
+.ticket-totals .row {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+  font-weight: bold;
+}
+
+.ticket-footer {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #555;
+}
+
+/* Ocultar todo cuando se imprima excepto ticket */
+@media print {
+  body > *:not(#ticket-print-area) {
+    display: none !important;
+  }
+  #ticket-print-area {
+    display: block !important;
+  }
+}

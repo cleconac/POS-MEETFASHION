@@ -1,0 +1,31 @@
+body {
+    font-family: Arial;
+    padding: 20px;
+}
+
+section {
+    background: #f5f5f5;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+}
+
+h1, h2 {
+    margin-top: 0;
+}
+
+.den-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+}
+
+.acciones {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    padding: 10px 15px;
+    font-size: 16px;
+}
