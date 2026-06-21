@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Catálogo de Artículos</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="catalog.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="title">Catálogo de Artículos</div>
+   <div  class="topbar-right">
+       <div>
+           <button class="btn small" onclick="abrirNuevo()">+ Nuevo Artículo</button>
+           <button class="btn-sec" onclick="window.location='ventas.html'">← Volver al POS</button>
+	   <input id="file-csv" type="file" accept=".csv" />
+   	   <button id="btn-import-csv" class="btn small">Importar CSV</button>
+       </div>
+    </div>
+
+</header>
+
+
+<div class="container">
+ <input  id="search-cat"  type="text"  placeholder="Buscar artículo..."  />
+
+    <table class="cat-table">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Artículo</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="catBody"></tbody>
+    </table>
+<div id="pagination"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal hidden">
+    <div class="modal-content">
+
+        <h3 id="modalTitle">Nuevo Artículo</h3>
+
+        <label>Código:</label>
+        <input type="text" id="cod">
+
+        <label>Nombre del Artículo:</label>
+        <input type="text" id="nom">
+
+        <label>Precio:</label>
+        <input type="number" step="0.01" id="pre">
+
+        <label>Stock:</label>
+        <input type="number" id="sto">
+
+        <div class="modal-buttons">
+            <button class="btn-primary" onclick="guardarArticulo()">Guardar</button>
+            <button class="btn-sec" onclick="cerrarModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+<script  src="auth.js"></script>
+<script>requireRole('admin');</script>
+<script src="db.js"></script>
+<script src="catalog.js"></script>
+
+</body>
+</html>

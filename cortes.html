@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Corte de Caja</title>
+    <link rel="stylesheet" href="css/cortes.css">
+</head>
+<body>
+
+    <h1>Corte de Caja</h1>
+
+    <section class="fondo">
+        <h2>Fondo de caja</h2>
+        <input type="number" id="fondo" step="0.01" placeholder="0.00">
+    </section>
+
+    <section class="periodo">
+        <h2>Periodo del corte</h2>
+        <label>Desde:</label>
+        <input type="date" id="desde">
+        <label>Hasta:</label>
+        <input type="date" id="hasta">
+        <button id="buscar">Buscar ventas</button>
+    </section>
+
+    <section class="resultado">
+        <h2>Resultados</h2>
+        <div>Total ventas: <span id="r-total">$0.00</span></div>
+        <div>Total efectivo: <span id="r-cash">$0.00</span></div>
+        <div>Total tarjeta: <span id="r-card">$0.00</span></div>
+        <div>Total transferencia: <span id="r-transfer">$0.00</span></div>
+    </section>
+
+    <section class="conteo">
+        <h2>Conteo de efectivo</h2>
+
+        <div id="denoms"></div>
+
+        <div>Total contado: <span id="contado">$0.00</span></div>
+        <div>Diferencia: <span id="diferencia">$0.00</span></div>
+    </section>
+
+    <div class="acciones">
+        <button id="guardar">Guardar corte</button>
+        <button id="imprimir">Imprimir corte</button>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="cortes.js"></script>
+
+</body>
+</html>

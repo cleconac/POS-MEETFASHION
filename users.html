@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><title>Usuarios - POS</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.container-small{ max-width:100%; margin:28px auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.06); }
+.form-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.form-row input, .form-row select{ padding:10px; border-radius:6px; border:1px solid #ddd; flex:1; }
+.user-list{ margin-top:20px; }
+.user-row{ display:flex; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #f0f0f0; align-items:center; }
+.small-btn{ padding:6px 8px; font-size:13px; }
+</style>
+<!--  Carga  la  API de  Maps  -->
+<script async  defer  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCGhzLaLLZCucTYPomCuzUTSlo6gdjVwbQ&libraries=places&callback=initAutocomplete"></script>
+<script>
+function  initAutocomplete()  {
+   const  input  = document.getElementById('u-address');
+    const autocomplete  =  new  google.maps.places.Autocomplete(input, {
+       types:  ['geocode'],
+       componentRestrictions: {  country:  'mx'  }
+   });
+   autocomplete.addListener('place_changed',  ()  => {
+       const  place  = autocomplete.getPlace();
+       if  (place.formatted_address)  {
+          input.value  = place.formatted_address;
+       }
+   });
+}
+</script>
+
+</head>
+<body>
+
+<header class="topbar">
+    <div class="title">Gestión de Usuarios</div>
+    <div  class="topbar-left">
+       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+       <button  class="btn small" onclick="abrirModalNuevo()">Agregar  usuario</button>
+   </div>
+</header>
+<div class="container container-small">
+
+<div class="user-header">
+    <h2>Usuarios</h2>
+</div>
+
+<table  class="user-table">
+   <thead>
+       <tr>
+	   <th>Usuario</th>
+	   <th>Nombre</th>
+	   <th>Correo</th>
+	   <th>Turno</th>
+	   <th>Modificado</th>
+	   <th>Acciones</th>
+       </tr>
+   </thead>
+   <tbody  id="user-list"></tbody>
+</table>
+</div>
+
+<!-- Modal de edición -->
+<div  id="modal-user"  class="modal  hidden">
+   <div  class="modal-content">
+      <h3  id="modal-title">Nuevo  usuario</h3>
+       <div class="form-row">
+           <input id="u-user"  placeholder="Usuario  (login)">
+          <input  id="u-name"  placeholder="Nombre completo">
+           <input id="u-pass"  placeholder="Contraseña"  type="password">
+       </div>
+      <div  class="form-row">
+          <input  id="u-phone"  placeholder="Teléfono"  maxlength="10">
+          <input  id="u-mail"  placeholder="Email">
+	  <gmpx-place-autocomplete  style="width:100%">
+	     <input  id="u-address" placeholder="Dirección"  />
+	  </gmpx-place-autocomplete>
+       </div>
+       <div  class="form-row">
+          <select  id="u-role"><option value="vendedor">Vendedor</option><option  value="admin">Administrador</option></select>
+          <select  id="u-shift"><option  value="matutino">Matutino</option><option  value="vespertino">Vespertino</option></select>
+      </div>
+       <div  class="form-row">
+          <button  class="btn"  onclick="saveUser()">Guardar</button>
+          <button  class="btn alt"  onclick="cerrarModal()">Cancelar</button>
+       </div>
+   </div>
+</div>
+
+<script  src="auth.js"></script>
+<script>requireRole('admin');</script>
+<script src="db.js"></script>
+<script>
+
+ window.addEventListener('DOMContentLoaded',  ()  => {
+     renderUsers();
+});
+
+let editId = null;
+
+function saveUser(){
+    const user  =  document.getElementById('u-user').value.trim();
+   if  (!user)  return alert('Usuario  requerido');
+
+   const  obj  = {
+       user,
+       name:  document.getElementById('u-name').value.trim(),
+      pass:  document.getElementById('u-pass').value,
+       phone:  document.getElementById('u-phone').value,
+      mail:  document.getElementById('u-mail').value,
+       address:  document.getElementById('u-address').value,
+      role:  document.getElementById('u-role').value,
+       shift:  document.getElementById('u-shift').value,
+      modified:  new  Date().toISOString()
+   };
+
+   DB.saveUser(obj);
+   renderUsers();
+   cerrarModal();
+}
+
+
+function editUser(u){
+  const obj = DB.getUsers().find(x=>x.user===u);
+  if(!obj) return;
+  document.getElementById('u-user').value = obj.user;
+  document.getElementById('u-name').value = obj.name || '';
+  document.getElementById('u-pass').value = obj.pass || '';
+  document.getElementById('u-phone').value = obj.phone || '';
+  document.getElementById('u-mail').value = obj.mail || '';
+  document.getElementById('u-address').value = obj.address || '';
+  document.getElementById('u-role').value = obj.role || 'vendedor';
+  document.getElementById('u-shift').value = obj.shift || 'matutino';
+}
+function deleteUser(u){
+  if(!confirm('Eliminar usuario?')) return;
+  DB.deleteUser(u);
+  renderUsers();
+}
+function verifyAddress(encoded){
+  if(!encoded) return alert('Sin dirección');
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encoded}`,'_blank');
+}
+
+
+renderUsers();
+
+
+function abrirModalNuevo(){
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Nuevo usuario';
+  document.querySelectorAll('#u-user,#u-name,#u-pass,#u-phone,#u-mail,#u-address').forEach(i => i.value = '');
+  document.getElementById('u-role').value = 'vendedor';
+  document.getElementById('u-shift').value = 'matutino';
+  document.getElementById('u-user').readOnly = false;
+  document.getElementById('modal-user').classList.remove('hidden');
+}
+
+function abrirModalEditar(u){
+  const obj = DB.getUsers().find(x => x.user === u);
+  if (!obj) return;
+  editId = u;
+  document.getElementById('modal-title').textContent = 'Editar usuario';
+  document.getElementById('u-user').value = obj.user;
+  document.getElementById('u-user').readOnly = true;
+  document.getElementById('u-name').value = obj.name || '';
+  document.getElementById('u-pass').value = obj.pass || '';
+  document.getElementById('u-phone').value = obj.phone || '';
+  document.getElementById('u-mail').value = obj.mail || '';
+  document.getElementById('u-address').value = obj.address || '';
+  document.getElementById('u-role').value = obj.role || 'vendedor';
+  document.getElementById('u-shift').value = obj.shift || 'matutino';
+  document.getElementById('modal-user').classList.remove('hidden');
+}
+
+function cerrarModal(){
+  document.getElementById('modal-user').classList.add('hidden');
+}
+
+
+function  renderUsers(){
+   const  ul =  document.getElementById('user-list');
+   const  users =  DB.getUsers();
+   ul.innerHTML  = '';
+   users.forEach(u  =>  {
+      const  tr =  document.createElement('tr');
+      tr.innerHTML  =  `
+         <td><strong>${u.user}</strong></td>
+          <td>${u.name  || ''}</td>
+          <td>${u.mail  || ''}</td>
+          <td>${u.shift  || ''}</td>
+          <td>${u.modified  ? new  Date(u.modified).toLocaleString()  : '-'}</td>
+          <td>
+             <button  class="small-btn" onclick="abrirModalEditar('${u.user}')">Editar</button>
+             <button  class="small-btn"  onclick="deleteUser('${u.user}')">Eliminar</button>
+             <button class="small-btn"  onclick="verifyAddress('${encodeURIComponent(u.address||'')}')">Ver  mapa</button>
+         </td>`;
+       ul.appendChild(tr);
+   });
+}
+
+
+
+</script>
+</body>
+</html>

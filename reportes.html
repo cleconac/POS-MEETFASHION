@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reportes • POS Local</title>
+  <link rel="stylesheet" href="css/reportes.css">
+</head>
+
+<body>
+<header class="topbar">
+    <div class="title">Reportes y ventas</div>
+    <div  class="topbar-left">
+       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+   </div>
+</header>
+
+  <main class="container">
+
+<section  class="card">
+      <div  class="container">
+       <h2>Reportes  de Cortes y Ventas</h2>
+
+       <div  class="filters">
+           <label>Desde:  <input  type="date"  id="desde"></label>
+          <label>Hasta:  <input  type="date"  id="hasta"></label>
+           <label>Tipo  de reporte:
+               <select  id="tipo-reporte">
+                  <option  value="ventas">Ventas</option>
+                  <option  value="cortes"  selected>Cortes</option>
+              </select>
+           </label>
+           <button  id="btn-buscar" class="btn  primary">Buscar</button>
+           <button  id="btn-exportar"  class="btn  secondary">Exportar CSV</button>
+        </div>
+       <div  id="lista-fechas"  class="report-results"></div>
+   </div>
+</section>
+  </main>
+
+<div  id="detalle-panel"  class="detalle-panel hidden">
+   <div  class="detalle-header">
+      <h3  id="detalle-fecha">Detalle  del corte</h3>
+       <button onclick="cerrarDetalle()"  class="btn-close">×</button>
+   </div>
+   <div  id="detalle-contenido" class="detalle-body"></div>
+</div>
+
+
+  <script  src="auth.js"></script>
+  <script>requireRole('admin');</script>
+  <script src="db.js"></script>
+  <script src="js/reportes.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,61 @@
+body {
+    font-family: monospace;
+    padding: 0;
+    margin: 0;
+}
+
+#ticket {
+    width: 58mm; /* ajustable a 80mm si quieres */
+    padding: 5px;
+}
+
+.title {
+    text-align: center;
+    font-size: 16px;
+    margin: 0;
+}
+
+.sub {
+    text-align: center;
+    font-size: 12px;
+    margin: 0 0 10px 0;
+}
+
+.line {
+    border-top: 1px dashed #000;
+    margin: 8px 0;
+}
+
+#t-items {
+    font-size: 12px;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.footer {
+    text-align: center;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+/* SOLO al imprimir */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #ticket, #ticket * {
+        visibility: visible;
+    }
+    #ticket {
+        margin: 0;
+    }
+}
+
+/* ticket print style (58mm) */
+#ticket { width:58mm; padding:6px; font-family:monospace; }
+.ticket-header{text-align:center}
+.ticket-items .row{display:flex;justify-content:space-between;margin:4px 0}
+.ticket-totals{border-top:1px dashed #000;margin-top:6px;padding-top:6px}

@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>POS Local - Estación</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="css/ticket.css">
+</head>
+<body>
+
+<!-- LOGIN FULLSCREEN (REEMPLAZA EL MODAL ANTERIOR) -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-left">
+      <img src="logo.png" alt="logo" class="login-logo">
+      <h1 class="login-company">MEET FASHION</h1>
+      <p class="login-sub">Punto de Venta Local</p>
+    </div>
+    <div class="login-right">
+      <h2>Acceso</h2>
+      <label>Usuario</label>
+      <input id="login-user" type="text" autocomplete="username">
+      <label>Contraseña</label>
+      <input id="login-pass" type="password" autocomplete="current-password">
+      <label>Estación</label>
+      <select id="login-station">
+        <option>Principal</option>
+        <option>Caja 1</option>
+        <option>Caja 2</option>
+      </select>
+
+      <div class="login-actions">
+        <button id="login-cancel" class="btn alt">Limpiar</button>
+        <button id="login-ok" class="btn">Ingresar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<header class="topbar">
+    <div  class="topbar-left">
+       <h2 id="ticket-num">Ticket  #000001</h2>
+       <button  id="btn-reprint"  class="btn  small">Reimprimir</button>
+   </div>
+
+   <div  class="topbar-center">
+       <span  id="estacion-activa">Estación:  Principal</span>
+       <span id="cashier">Usuario:  Terminal1</span>
+       <span  id="turno-activo">Turno:  —</span>
+   </div>
+
+   <div  class="topbar-right">
+       <nav  class="topbar-nav">
+           <button id="btn-catalogo"  class="btn  small">Catálogo  (F2)</button>
+          <button  id="btn-cobrar"  class="btn  small">Cobrar  (F5)</button>
+
+           <div  class="dropdown">
+              <button  class="btn  small admin-only">Admin  ▾</button>
+              <div  class="dropdown-menu">
+                  <button  id="btn-open-catalog"  class="small">Catálogo</button>
+                  <button  id="btn-open-reports"  class="small">Reportes</button>
+                 <button  id="btn-users"  class="small">Usuarios</button>
+              </div>
+           </div>
+
+           <button  id="btn-cashcount"  class="btn small">Conteo  efectivo</button>
+           <button  id="btn-corte" class="btn  small">Corte</button>
+           <button  id="btn-logout" class="btn  small  alt">Cerrar  sesión</button>
+       </nav>
+
+       <button class="hamburger"  id="hamburger-toggle">☰</button>
+    </div>
+</header>
+  <main id="pos-layout">
+
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div id="pos-body">
+
+        <!-- COLUMNA IZQUIERDA -->
+        <div id="col-izq">
+
+            <!-- IMAGEN DEL PRODUCTO -->
+            <div id="producto-preview">
+                <img id="preview-img" src="logo.png">
+            </div>
+
+            <!-- BUSCADOR -->
+            <div id="busqueda-box">
+                 <input type="text" id="buscar" placeholder="Buscar producto..." />
+	    </div>
+
+	    <!-- Contenedor para resultados (oculto por defecto, se usa si quieres) -->
+	    <div id="results" style="display:none; max-height:230px; overflow:auto;"></div>
+        </div>
+
+	<!-- COLUMNA DERECHA (CARRITO) -->
+	<div id="col-der">
+	  <h3>Artículos seleccionados</h3>
+
+	  <!-- Tabla tipo lista con scroll independiente -->
+	  <div id="carrito-lista" class="carrito-scroll">
+	    <!-- Aquí se renderizan los items -->
+	  </div>
+
+	  <!-- Total debajo, fijo -->
+	  <div id="total-box">
+	    <span>Total:</span>
+	    <h1 id="total">$0.00</h1>
+	  </div>
+	</div>
+    </div>
+</main>
+
+
+  <!-- Modal conteo de efectivo -->
+<div id="modal-cashcount" class="modal hidden">
+  <div class="modal-content">
+    <h3>Conteo de efectivo</h3>
+    <div id="denoms-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px"></div>
+    <div style="margin-top:12px; display:flex;justify-content:space-between;align-items:center">
+      <div class="total-conteo-efectivo">Total contado: <strong id="cashcount-total">$0.00</strong></div>
+      <div style="display:flex;gap:8px">
+        <button id="cashcount-print" class="btn">Imprimir</button>
+        <button id="cashcount-close" class="btn alt">Salir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Modal catálogo (simple) -->
+  <div id="modal-catalog" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <h3>Catálogo de artículos</h3>
+      <div id="catalog-list" class="catalog-list"></div>
+      <div class="modal-actions">
+        <button id="btn-close-catalog" class="btn">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+
+<!-- Modal de ticket -->
+<div id="ticket-modal" class="modal hidden">
+    <div class="modal-content" style="width:300px">
+
+        <div id="ticket-company" style="text-align:center;font-weight:bold;font-size:18px;margin-bottom:6px;">
+            MEET FASHION
+        </div>
+
+        <div id="ticket-date" style="text-align:center;font-size:12px;margin-bottom:10px;"></div>
+
+        <div id="ticket-items" class="ticket-items"></div>
+
+        <hr>
+
+        <div class="ticket-totals">
+            <div class="row"><span>Total:</span> <span id="ticket-total"></span></div>
+            <div class="row"><span>Pagado:</span> <span id="ticket-paid"></span></div>
+            <div class="row"><span>Cambio:</span> <span id="ticket-change"></span></div>
+        </div>
+
+        <hr>
+
+        <div class="ticket-footer" style="text-align:center;margin-top:8px;">¡Gracias por su compra!</div>
+
+        <!-- Área oculta donde ticket.js dejará el HTML final -->
+        <div id="ticket-preview" style="display:none;"></div>
+
+        <div style="margin-top:15px; display:flex; gap:8px;">
+            <button id="ticket-print" class="btn">Imprimir</button>
+            <button id="ticket-close" class="btn alt">Cerrar</button>
+        </div>
+
+    </div>
+</div>
+
+
+
+
+<!-- Modal de pago (profesional) -->
+  <div id="modal-payment" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content payment-modal">
+      <h3>Registrar Pago</h3>
+
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:13px;color:#666">Total venta</div>
+          <div style="font-size:20px;font-weight:700" id="pay-total-pro">$0.00</div>
+
+          <div style="margin-top:10px">
+            <label>Efectivo</label>
+            <input id="pay-cash-pro" class="pay-input" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
+          </div>
+
+          <div style="margin-top:8px">
+            <label>Tarjeta</label>
+            <input id="pay-card-pro" class="pay-input" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
+          </div>
+
+          <div style="margin-top:8px">
+            <label>Transferencia</label>
+            <input id="pay-transfer-pro" class="pay-input" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div style="width:200px">
+          <div style="font-size:13px;color:#666">Resumen de pago</div>
+          <div style="margin-top:8px">Pagado: <strong id="total-paid-pro">$0.00</strong></div>
+          <div style="margin-top:8px">Cambio: <strong id="change-pro">$0.00</strong></div>
+
+          <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+            <button id="close-payment" class="btn alt">Cancelar</button>
+            <button id="confirm-payment" class="btn">Aceptar venta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pregunta imprimir (pequeño) -->
+  <div id="modal-print-ask" class="modal hidden">
+    <div class="modal-content" style="text-align:center">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="margin-top:8px;gap:8px;justify-content:flex-end">
+	      <h2 style="margin-top:0">¿Deseas imprimir ticket?</h2>
+	      <div style="font-size:12px;color:#666;margin:10px 0">Imprimir ahora desde la impresora configurada</div>
+	      <button id="print-yes" class="btn">Sí</button>
+              <button id="print-no" class="btn alt">No</button>
+          </div>
+        </div>
+        <div style="width:260px;border-left:1px solid #eee;padding-left:12px">
+	  <div  id="print-preview"  class="ticket-preview-area"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pregunta corte -->
+  <div id="modal-print-corte" class="modal hidden">
+    <div class="modal-content" style="text-align:center">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="margin-top:8px;gap:8px;justify-content:flex-end">
+	      <h2 style="margin-top:0">¿Deseas imprimir corte?</h2>
+	      <div style="font-size:12px;color:#666;margin:10px 0">Imprimir ahora desde la impresora configurada</div>
+	      <button id="corte-print-yes" class="btn">Sí</button>
+              <button id="corte-print-no" class="btn alt">No</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REIMPRIMIR TICKET -->
+  <div id="modal-reimprimir" class="modal hidden">
+    <div class="modal-content">
+      <h3>Reimprimir ticket</h3>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label>Estación</label>
+          <input id="reimp-station" type="text" value="Principal" />
+          <label style="margin-top:8px">Número de ticket</label>
+          <input id="reimp-ticket" type="number" />
+          <div style="margin-top:8px;gap:8px;justify-content:flex-end">
+            <button id="reimp-search" class="btn">Buscar</button>
+            <button id="reimp-close" class="btn alt">Cancelar</button>
+          </div>
+        </div>
+        <div style="width:260px;border-left:1px solid #eee;padding-left:12px">
+          <div style="font-size:13px;color:#666">Previsualización</div>
+          <div id="reimp-preview" style="margin-top:8px;font-size:13px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button id="reimp-print" class="btn">Imprimir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- MODAL COINCIDENCIAS -->
+<div id="modal-coincidencias" class="modal hidden" tabindex="0">
+    <div class="modal-content">
+        <h3>Coincidencias</h3>
+        <div id="lista-coincidencias" class="scroll" style="max-height:320px; overflow:auto;"></div>
+        <div style="margin-top:12px; display:flex;justify-content:flex-end;gap:8px;">
+            <button id="cerrar-coincidencias" class="btn alt">Cerrar (ESC)</button>
+        </div>
+    </div>
+</div>
+
+  <!-- Modal pregunta cerrar sesión (pequeño) -->
+  <div id="modal-logout" class="modal hidden">
+    <div class="modal-content" style="text-align:center">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="margin-top:8px;gap:8px;justify-content:flex-end">
+	      <h2 style="margin-top:0">¿Deseas cerrar sesión?</h2>
+	      <button id="logout-yes" class="btn">Sí</button>
+              <button id="logout-no" class="btn alt">No</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Corte -->
+  <div id="modal-corte" class="modal hidden">
+    <div class="modal-content" style="text-align:center">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="margin-top:8px;gap:8px;justify-content:flex-end">
+	      <h2 style="margin-top:0">¿Ejecutar  corte  del  periodo?</h2>
+	      <button id="corte-yes" class="btn">Sí</button>
+              <button id="corte-no" class="btn alt">No</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Zona oculta para impresión -->
+<div id="ticket-print-area" style="display:none;"></div>
+
+  <script src="db.js"></script>
+
+  <!-- Cargar módulos primero -->
+  <script type="module">
+      import { initTicket } from "./js/ticket.js";
+      import { initPayments } from "./js/payments.js";
+
+      // inicializar pagos
+      initPayments(
+          () => cart,
+          () => {
+              cart = [];
+              renderCart();
+              recalc();
+              updatePaymentsDisplay();
+          }
+      );
+
+      // inicializar ticket
+      initTicket();
+  </script>
+
+  <!-- AHORA sí cargas main.js! -->
+  <script src="main.js"></script>
+
+</body>
+</html>
