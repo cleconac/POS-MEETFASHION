@@ -1,13 +1,13 @@
 // main.js - corregido para IDs/coach modal coincidencias/guardas null
 
 // --- configuración / estado ---
-const cashier = localStorage.getItem('pos_cashier') || 'Terminal1';
+const cashier = sessionStorage.getItem('pos_cashier') || 'Terminal1';
 const cashierEl = document.getElementById('cashier');
 if (cashierEl) cashierEl.textContent = `Usuario: ${cashier}`;
 
 let catalog = DB.getArticles();
 let cart = [];
-let ticketSeq = Number(localStorage.getItem('pos_ticket_seq') || '0');
+let ticketSeq = Number(sessionStorage.getItem('pos_ticket_seq') || '0');
 let currentUser = null;
 let  indexCart  =  -1;
 let  editId  = null;
@@ -77,8 +77,8 @@ function hideLoginScreen(){ document.getElementById('login-screen').classList.ad
 
 function setUserContext(user){
   currentUser = user;
-  localStorage.setItem('pos_user', JSON.stringify(user));
-  localStorage.setItem('pos_cashier', user.user);
+  sessionStorage.setItem('pos_user', JSON.stringify(user));
+  sessionStorage.setItem('pos_cashier', user.user);
   if(el.cashierSpan) el.cashierSpan.textContent = `Usuario: ${user.user}`;
   if(el.ticketNum) el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
   if(el.stationSpan) el.stationSpan.textContent = `Estación: ${user.station || 'Principal'}`;
@@ -88,7 +88,7 @@ function setUserContext(user){
 // Inicializar auth
 (function  initAuth(){
    DB.ensureSeed  &&  DB.ensureSeed();
-   const  saved  = localStorage.getItem('pos_user');
+   const  saved  = sessionStorage.getItem('pos_user');
     if(saved){
       try  {
           const  user  =  JSON.parse(saved);
@@ -141,11 +141,11 @@ function  logout()  {
    //  Limpia  datos  en  memoria
    currentUser  =  null;
 
-    //  Limpia localStorage
-    localStorage.removeItem('pos_user');
-   localStorage.removeItem('pos_cashier');
-    localStorage.removeItem('estacion-activa');
-   localStorage.removeItem('lastCutISO');
+    //  Limpia sessionStorage
+    sessionStorage.removeItem('pos_user');
+   sessionStorage.removeItem('pos_cashier');
+    sessionStorage.removeItem('estacion-activa');
+   sessionStorage.removeItem('lastCutISO');
 
    //  Limpia  campos  del login
     document.getElementById('login-user').value  = "";
@@ -596,13 +596,13 @@ document.getElementById('btn-backup')?.addEventListener('click', ()=> {
 
 
 function onSaleDoneCallback(sale){
-    ticketSeq = Number(localStorage.getItem("pos_ticket_seq") || ticketSeq);
+    ticketSeq = Number(sessionStorage.getItem("pos_ticket_seq") || ticketSeq);
     actualizarTicketDisplay();
 }
 
 
 window.updateTicketNumber = function() {
-    const seq = Number(localStorage.getItem("pos_ticket_seq") || "0");
+    const seq = Number(sessionStorage.getItem("pos_ticket_seq") || "0");
     const label = document.getElementById("ticket-num");
     if (label) label.textContent = `Ticket #${String(seq).padStart(6, "0")}`;
 };
@@ -838,10 +838,10 @@ const html  =  `
 
 //  Helpers  para  el  corte  por  periodos
 function  getLastCutISO()  {
-    return  localStorage.getItem('pos_last_cut') ||  null;
+    return  sessionStorage.getItem('pos_last_cut') ||  null;
 }
 function  setLastCutISO(iso)  {
-    localStorage.setItem('pos_last_cut',  iso);
+    sessionStorage.setItem('pos_last_cut',  iso);
 }
 
 document.getElementById('btn-corte')?.addEventListener('click',  ()  =>  {
@@ -849,7 +849,7 @@ document.getElementById('btn-corte')?.addEventListener('click',  ()  =>  {
 
     const onYes = () => {
     document.getElementById('modal-corte').classList.add('hidden');
-    const  cashierId  =  localStorage.getItem('pos_cashier')  ||  'Terminal1';
+    const  cashierId  =  sessionStorage.getItem('pos_cashier')  ||  'Terminal1';
     const  now =  new  Date();
 
     //  Desde:  el  último  corte;  si  no  existe,  inicio  del  día
@@ -908,7 +908,7 @@ ventasPeriodo.forEach(v  =>  {
     //  Construir  HTML  del  corte
     let  html  =  `<div  style="padding:12px">
         <h2>Corte  -  ${now.toLocaleString()}</h2>
-        <div>Estación:  ${localStorage.getItem('estacion-activa')  ||  'Principal'}</div>
+        <div>Estación:  ${sessionStorage.getItem('estacion-activa')  ||  'Principal'}</div>
         <div>Usuario:  ${cashierId}</div>
         <div>Turno:  ${currentUser?.turno  || '—'}</div>
         <div>Periodo:  ${desde.toLocaleString()}  →  ${hasta.toLocaleString()}</div>
@@ -1037,7 +1037,7 @@ document.getElementById('btn-reprint')?.addEventListener('click', ()=> {
  }
 
 // init display
-ticketSeq = Number(localStorage.getItem('pos_ticket_seq') || ticketSeq);
+ticketSeq = Number(sessionStorage.getItem('pos_ticket_seq') || ticketSeq);
 el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
 renderResults(catalog); // pondrá lista en #results (oculto)
 recalc();
