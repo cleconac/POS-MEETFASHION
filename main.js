@@ -767,7 +767,55 @@ if(denomContainer){
   }
   denomContainer.addEventListener('input', calcDenoms);
   document.getElementById('btn-cashcount')?.addEventListener('click', ()=> document.getElementById('modal-cashcount').classList.remove('hidden'));
-  document.getElementById('cashcount-close')?.addEventListener('click', ()=> document.getElementById('modal-cashcount').classList.add('hidden'));
+  document.getElementById('cashcount-close')?.addEventListener('click', ()=> {
+    const modal = document.getElementById('modal-cashcount');
+    modal.classList.add('hidden');
+
+    // Reiniciar todos los inputs de denominaciones
+    denomContainer.querySelectorAll('.denom-input').forEach(input => {
+        input.value = 0;
+    });
+
+    // Reiniciar el total mostrado
+    document.getElementById('cashcount-total').textContent = fmtMX(0);
+
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        const modal = document.getElementById("modal-cashcount");
+        if (modal && !modal.classList.contains("hidden")) {
+            // Cerrar modal
+            modal.classList.add("hidden");
+
+            // Reiniciar inputs
+            const denomContainer = document.getElementById("denoms-list");
+            denomContainer?.querySelectorAll(".denom-input").forEach(input => {
+                input.value = 0;
+            });
+
+            // Reiniciar total mostrado
+            const totalDisplay = document.getElementById("cashcount-total");
+            if (totalDisplay) totalDisplay.textContent = fmtMX(0);
+        }
+	
+	const modalPay = document.getElementById("modal-payment");
+        if (modalPay && !modalPay.classList.contains("hidden")) {
+            // Cerrar modal
+            modalPay.classList.add("hidden");
+        }
+
+	const modalCor = document.getElementById("modal-corte");
+        if (modalCor && !modalCor.classList.contains("hidden")) {
+            // Cerrar modal
+            modalCor.classList.add("hidden");
+        }
+
+    }
+});
+
+
+
  document.getElementById('cashcount-print')?.addEventListener('click',  ()=>  {
     const  inputs =  denomContainer.querySelectorAll('.denom-input');
     let  total  =  0;
@@ -833,6 +881,13 @@ const html  =  `
     }
  
     document.getElementById('modal-cashcount').classList.add('hidden');
+    // Reiniciar todos los inputs de denominaciones
+    denomContainer.querySelectorAll('.denom-input').forEach(input => {
+        input.value = 0;
+    });
+
+    // Reiniciar el total mostrado
+    document.getElementById('cashcount-total').textContent = fmtMX(0);
  });
 }
 
@@ -909,7 +964,7 @@ ventasPeriodo.forEach(v  =>  {
     let  html  =  `<div  style="padding:12px">
         <h2>Corte  -  ${now.toLocaleString()}</h2>
         <div>Estación:  ${sessionStorage.getItem('estacion-activa')  ||  'Principal'}</div>
-        <div>Usuario:  ${cashierId}</div>
+        <div>	:  ${cashierId}</div>
         <div>Turno:  ${currentUser?.turno  || '—'}</div>
         <div>Periodo:  ${desde.toLocaleString()}  →  ${hasta.toLocaleString()}</div>
         <hr>
@@ -1034,6 +1089,15 @@ document.getElementById('btn-reprint')?.addEventListener('click', ()=> {
            previewBox.innerHTML  = previewBox.dataset.originalHtml;
         }
     });
+
+document.addEventListener('keydown', (e)  =>  {
+   if  (e.key  === 'Escape')  {
+      if  (el.reimpModal  &&  !el.reimpModal.classList.contains('hidden')) {
+           el.reimpModal.classList.add('hidden');
+      }
+   }
+});
+
  }
 
 // init display
