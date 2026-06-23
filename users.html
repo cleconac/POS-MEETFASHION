@@ -67,7 +67,13 @@ function  initAutocomplete()  {
        <div class="form-row">
            <input id="u-user"  placeholder="Usuario  (login)">
           <input  id="u-name"  placeholder="Nombre completo">
-           <input id="u-pass"  placeholder="Contraseña"  type="password">
+           <!-- Campo de contraseña con el ojo integrado -->
+           <div class="password-wrapper" style="position: relative; display: flex; align-items: center; flex: 1;">
+               <input id="u-pass" placeholder="Contraseña" type="password" style="padding-right: 40px; width: 100%;">
+               <button type="button" id="toggle-u-pass" style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; color: #6c757d; z-index: 10;">
+                   👁️
+               </button>
+           </div>
        </div>
       <div  class="form-row">
           <input  id="u-phone"  placeholder="Teléfono"  maxlength="10">
@@ -198,6 +204,22 @@ function  renderUsers(){
        ul.appendChild(tr);
    });
 }
+
+// Control de visibilidad de la contraseña en la modal de usuarios
+document.addEventListener('click', function(event) {
+    if (event.target && event.target.id === 'toggle-u-pass') {
+        const passwordInput = document.getElementById('u-pass');
+        const button = event.target;
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            button.textContent = '🙈'; // Cambia el icono cuando es visible
+        } else {
+            passwordInput.type = 'password';
+            button.textContent = '👁️'; // Regresa al icono original
+        }
+    }
+});
 
 
 
