@@ -183,6 +183,16 @@ function cerrarModal(){
   document.getElementById('modal-user').classList.add('hidden');
 }
 
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        const modal = document.getElementById("modal-user");
+        if (modal && !modal.classList.contains("hidden")) {
+            // Cerrar modal
+            modal.classList.add("hidden");
+	}
+    }
+});
+
 
 function  renderUsers(){
    const  ul =  document.getElementById('user-list');
