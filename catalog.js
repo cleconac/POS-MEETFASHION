@@ -195,3 +195,46 @@ function parseAndImportCSV(text){
   location.reload();
 }
 
+function exportCatalogCSV() {
+    const rows = [];
+    const headers = ["Código", "Artículo", "Precio", "Stock"];
+    rows.push(headers);
+
+    document.querySelectorAll("#catBody tr").forEach(tr => {
+        const cols = tr.querySelectorAll("td");
+        rows.push([
+            cols[0].textContent.trim(),
+            cols[1].textContent.trim(),
+            parseFloat(cols[2].textContent.replace(/[^0-9.]/g, "")),
+            parseInt(cols[3].textContent.trim())
+        ]);
+    });
+
+    const csvContent = rows.map(e => e.join(",")).join("\n");
+
+    // 🔹 BOM al inicio para que Excel reconozca UTF-8
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "CatalogoArticulos.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+
+document.getElementById("btn-export-csv")?.addEventListener("click", exportCatalogCSV);
+
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        const modal = document.getElementById("modal");
+        if (modal && !modal.classList.contains("hidden")) {
+            // Cerrar modal
+            modal.classList.add("hidden");
+	}
+    }
+});
