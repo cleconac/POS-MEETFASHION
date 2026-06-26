@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><title>Estaciones - POS</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.container-small{ max-width:100%; margin:28px auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.06); }
+.form-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.form-row input, .form-row select{ padding:10px; border-radius:6px; border:1px solid #ddd; flex:1; }
+.user-list{ margin-top:20px; }
+.user-row{ display:flex; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #f0f0f0; align-items:center; }
+.small-btn{ padding:6px 8px; font-size:13px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="title">Gestión de Estaciones de trabajo</div>
+    <div  class="topbar-left">
+       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+       <button  class="btn small" onclick="abrirModalNuevo()">Agregar  estación</button>
+   </div>
+</header>
+<div class="container container-small">
+
+
+
+
+<div class="user-header">
+    <h2>Usuarios</h2>
+</div>
+
+<table  class="user-table">
+   <thead>
+       <tr>
+	   <th>Estación</th>
+	   <th>Nombre</th>
+	   <th>Modificado</th>
+	   <th>Acciones</th>
+       </tr>
+   </thead>
+   <tbody  id="stations-list"></tbody>
+</table>
+</div>
+
+<!-- Modal de estación -->
+<div  id="modal-station"  class="modal  hidden">
+   <div  class="modal-content">
+      <h3  id="modal-title-station">Nueva  estación</h3>
+       <div class="form-row">
+           <input id="u-station"  placeholder="Nombre de la estación">
+       </div>
+       <div  class="form-row">
+          <button  class="btn"  onclick="saveStation()">Guardar</button>
+          <button  class="btn alt"  onclick="cerrarModal()">Cancelar</button>
+       </div>
+   </div>
+</div>
+
+<script  src="auth.js"></script>
+<script>requireRole('admin');</script>
+<script src="db.js"></script>
+<script>
+
+ window.addEventListener('DOMContentLoaded',  ()  => {
+     DB.getStations();
+});
+
+function saveStation(){
+    const station  =  document.getElementById('u-station').value.trim();
+   if  (!station)  return alert('Estación  requerido');
+
+   const  obj  = {
+       station,
+       name:  document.getElementById('u-station').value.trim(),
+       modified:  new  Date().toISOString()
+   };
+
+   DB.saveStations(obj);
+   renderStations();
+   cerrarModal();
+}
+
+function abrirModalNuevo(){
+  editId = null;
+  document.getElementById('modal-title-station').textContent = 'Nueva estación';
+  document.querySelectorAll('#u-station').forEach(i => i.value = '');
+  document.getElementById('u-station').readOnly = false;
+  document.getElementById('modal-station').classList.remove('hidden');
+}
+
+function abrirModalEditarEstacion(u){
+  const obj = DB.getStations().find(x => x.station === u);
+  if (!obj) return;
+  editId = u;
+  document.getElementById('modal-title-station').textContent = 'Editar estación';
+  document.getElementById('u-station').value = obj.station;
+  document.getElementById('u-station').readOnly = true;
+  document.getElementById('modal-station').classList.remove('hidden');
+}
+
+function editStation(u){
+  const obj = DB.getStations().find(x=>x.station===u);
+  if(!obj) return;
+  document.getElementById('u-station').value = obj.station;
+}
+
+function  renderStations(){
+   const  ul =  document.getElementById('stations-list');
+   const  stations =  DB.getStations();
+   ul.innerHTML  = '';
+   stations.forEach(u  =>  {
+      const  tr =  document.createElement('tr');
+      tr.innerHTML  =  `
+         <td><strong>${u.station}</strong></td>
+          <td>${u.modified  ? new  Date(u.modified).toLocaleString()  : '-'}</td>
+          <td>
+             <button  class="small-btn" onclick="abrirModalEditarEstacion('${u.station}')">Editar</button>
+             <button  class="small-btn"  onclick="deleteStation('${u.station}')">Eliminar</button>
+         </td>`;
+       ul.appendChild(tr);
+   });
+}
+
+function deleteStation(u){
+  if(!confirm('Eliminar estación?')) return;
+  DB.deleteStations(u);
+  renderStations();
+}
+
+function cerrarModal(){
+  document.getElementById('modal-estation').classList.add('hidden');
+}
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        const modal = document.getElementById("modal-station");
+        if (modal && !modal.classList.contains("hidden")) {
+            // Cerrar modal
+            modal.classList.add("hidden");
+	}
+    }
+});
+
+
+</script>
+</body>
+</html>
