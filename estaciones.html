@@ -18,7 +18,7 @@
     <div class="title">Gestión de Estaciones de trabajo</div>
     <div  class="topbar-left">
        <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
-       <button  class="btn small" onclick="abrirModalNuevo()">Agregar  estación</button>
+       <button  class="btn small" onclick="abrirModalNuevaEstacion()">Agregar  estación</button>
    </div>
 </header>
 <div class="container container-small">
@@ -27,13 +27,12 @@
 
 
 <div class="user-header">
-    <h2>Usuarios</h2>
+    <h2>Estaciones</h2>
 </div>
 
 <table  class="user-table">
    <thead>
        <tr>
-	   <th>Estación</th>
 	   <th>Nombre</th>
 	   <th>Modificado</th>
 	   <th>Acciones</th>
@@ -67,21 +66,55 @@
 });
 
 function saveStation(){
-    const station  =  document.getElementById('u-station').value.trim();
-   if  (!station)  return alert('Estación  requerido');
+    const nameIn  =  document.getElementById('u-station').value.trim();
+   if  (!nameIn)  return alert('Estación  requerido');
 
-   const  obj  = {
-       station,
-       name:  document.getElementById('u-station').value.trim(),
-       modified:  new  Date().toISOString()
-   };
+    // 1. Obtener la lista actual de arreglos desde la DB
+    const listaActual = DB.getStations();
 
-   DB.saveStations(obj);
-   renderStations();
-   cerrarModal();
+    // 2. Validar que no se repitan nombres
+    if (listaActual.some(e => e.nombre.toLowerCase() === nameIn.toLowerCase())) {
+        return alert('Esta estación ya existe.');
+    }
+
+    // 3. Construir el nuevo objeto respetando tus propiedades
+    const nuevaEstacion = {
+        id: Date.now().toString(),
+        nombre: nameIn,
+        activa: true
+    };
+
+    // 4. Agregar el objeto al array existente
+    listaActual.push(nuevaEstacion);
+
+    // 5. Enviar la LISTA COMPLETA a tu DB
+    DB.saveStations(listaActual);
+
+    // 6. Limpiar el formulario y cerrar modal
+    document.getElementById('u-station').value = '';
+    cerrarModal();
+    
+    // 7. Refrescar la tabla
+    renderStations();
 }
 
-function abrirModalNuevo(){
+// --- ELIMINAR ESTACIÓN ---
+function eliminarEstacion(id) {
+    const listaActual = DB.getStations();
+    
+    // Restricción de seguridad: no dejar el negocio con cero cajas
+    if (listaActual.length <= 1) {
+        return alert('Debe quedar al menos una estación activa en el sistema.');
+    }
+
+    if (confirm('¿Seguro que deseas eliminar esta estación?')) {
+        // Ejecutamos tu función central pasándole el ID
+        DB.deleteStations(id); 
+        renderStations(); // Recargar la tabla
+    }
+}
+
+function abrirModalNuevaEstacion(){
   editId = null;
   document.getElementById('modal-title-station').textContent = 'Nueva estación';
   document.querySelectorAll('#u-station').forEach(i => i.value = '');
@@ -107,6 +140,7 @@ function editStation(u){
 
 function  renderStations(){
    const  ul =  document.getElementById('stations-list');
+   if (!ul) return;
    const  stations =  DB.getStations();
    ul.innerHTML  = '';
    stations.forEach(u  =>  {
