@@ -38,7 +38,7 @@ function  cargarCatalogo(page  =  1) {
                      <td>
                             <button  class="btn-primary"  onclick="editar('${a.id}')">Editar</button>
                             <button  class="btn-sec"  onclick="eliminar('${a.id}')">Eliminar</button>
-                            <button  class="btn-sec"  onclick="stock('${a.id}')">📋 Stock</button>
+			    <button class="btn-sec" onclick="openStockModal('${a.id}')">📋 Stock</button>
 
                      </td>
               `;
@@ -142,90 +142,6 @@ function guardarArticulo() {
     cargarCatalogo();
 }
 
-let currentStockArticleCode = null; // Guarda el código del artículo seleccionado
-
-function abrirModalStock(codigoArticulo) {
-    const articulo = DB.getArticles().find(a => a.codigo === codigoArticulo);
-    if (!articulo) return;
-
-    currentStockArticleCode = codigoArticulo;
-    
-    // Rellenar etiquetas e inputs informativos
-    document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
-    document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
-    document.getElementById('st-current').value = articulo.stock || 0;
-    
-    // Limpiar campos de captura
-    document.getElementById('st-qty').value = '';
-    document.getElementById('st-reason').value = '';
-    document.getElementById('st-type').selectedIndex = 0;
-
-    document.getElementById('modal-stock-adjust').classList.remove('hidden');
-}
-
-//El sistema calculará el nuevo stock sumando o restando automáticamente según el tipo de operación, capturando al usuario logueado en la sesión activa
-
-function guardarAjusteInventario() {
-    const qtyIn = parseInt(document.getElementById('st-qty').value);
-    const typeIn = document.getElementById('st-type').value;
-    const reasonIn = document.getElementById('st-reason').value.trim();
-    const currentStock = parseInt(document.getElementById('st-current').value || 0);
-
-    // 1. Validaciones obligatorias de seguridad
-    if (!qtyIn || qtyIn <= 0 || isNaN(qtyIn)) return alert("Ingresa una cantidad válida mayor a cero.");
-    if (!reasonIn) return alert("Por favor, describe el motivo detallado del movimiento.");
-
-    // Recuperar usuario logueado de la sesión activa
-    const userSession = JSON.parse(sessionStorage.getItem('pos_user')) || { user: 'Desconocido' };
-
-    // 2. Determinar si el movimiento suma o resta al inventario
-    const esSalida = typeIn.includes('salida');
-    let nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
-
-    if (nuevoStock < 0) {
-        return alert(`Operación inválida: El ajuste dejaría el stock en negativo (${nuevoStock}). Verifica las unidades.`);
-    }
-
-    // 3. ACTUALIZAR EL ARTÍCULO EN EL CATÁLOGO
-    const listaArticulos = DB.getArticles();
-    const articulosActualizados = listaArticulos.map(art => {
-        if (art.codigo === currentStockArticleCode) {
-            return { ...art, stock: nuevoStock };
-        }
-        return art;
-    });
-    DB.saveArticles(articulosActualizados);
-
-    // 4. CREAR EL REGISTRO DE AUDITORÍA (KARDEX)
-    const historialLog = DB.getInventoryLog();
-    const nuevoRegistroLog = {
-        id: Date.now().toString(),
-        fecha: new Date().toISOString(),
-        usuario: userSession.user,
-        codigo: currentStockArticleCode,
-        tipo_movimiento: typeIn,
-        cantidad_movida: qtyIn,
-        stock_anterior: currentStock,
-        stock_actualizado: nuevoStock,
-        motivo: reasonIn
-    };
-    
-    historialLog.unshift(nuevoRegistroLog); // Añade al inicio del historial
-    DB.saveInventoryLog(historialLog);
-
-    alert(`¡Movimiento aplicado con éxito! Nuevo stock: ${nuevoStock} unidades.`);
-    
-    // 5. Limpieza de UI
-    cerrarModalStock();
-    if (typeof renderArticles === "function") renderArticles(); // Refresca tu tabla de artículos
-}
-
-function cerrarModalStock() {
-    document.getElementById('modal-stock-adjust').classList.add('hidden');
-    currentStockArticleCode = null;
-}
-
-
 // ---------- ELIMINAR ----------
 function eliminar(id) {
     if (!confirm("¿Eliminar artículo?")) return;
@@ -326,5 +242,104 @@ document.addEventListener("keydown", (event) => {
             // Cerrar modal
             modal.classList.add("hidden");
 	}
+        const modalStock = document.getElementById("modal-stock-adjust");
+        if (modalStock && !modalStock.classList.contains("hidden")) {
+            // Cerrar modal
+            modalStock.classList.add("hidden");
+	}
     }
 });
+
+// Variable global para recordar qué artículo estamos alterando
+let currentStockArticleCode = null;
+
+// Función que se activa al presionar tu nuevo botón de Stock en la tabla
+function openStockModal(idArticulo) {
+    const articulo = DB.getArticles().find(a => a.id === idArticulo);
+    if (!articulo) return alert("Artículo no encontrado.");
+
+    // Guardar el identificador para el proceso de guardado
+    currentStockArticleCode = articulo.id || articulo.codigo; 
+    
+    // INYECCIÓN DE DATOS CORREGIDA:
+    document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
+    document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
+    
+    // Forzamos a que extraiga el stock real de la tabla y lo inyecte en el input st-current
+    const stockReal = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
+    document.getElementById('st-current').value = stockReal;
+    
+    // Limpieza estricta de los campos de captura para cada apertura nueva
+    document.getElementById('st-qty').value = '';
+    document.getElementById('st-reason').value = '';
+    document.getElementById('st-type').selectedIndex = 0;
+
+    // Mostrar modal
+    document.getElementById('modal-stock-adjust').classList.remove('hidden');
+}
+
+
+
+// Función encargada de procesar, guardar y auditar el movimiento de inventario
+function guardarAjusteInventario() {
+    const qtyIn = parseInt(document.getElementById('st-qty').value);
+    const typeIn = document.getElementById('st-type').value;
+    const reasonIn = document.getElementById('st-reason').value.trim();
+    const currentStock = parseInt(document.getElementById('st-current').value || 0);
+
+    // 1. Candados de validación obligatorios
+    if (!qtyIn || qtyIn <= 0 || isNaN(qtyIn)) {
+        return alert("Por favor, ingresa una cantidad válida mayor a cero.");
+    }
+    if (!reasonIn) {
+        return alert("Por favor, describe detalladamente el motivo del movimiento.");
+    }
+
+    // 2. Evaluar si la operación es una salida de mercancía para restar
+    const esSalida = typeIn.includes('salida');
+    let nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
+
+    // 3. Control de inventario en negativo
+    if (nuevoStock < 0) {
+        return alert(`Operación cancelada: El ajuste dejaría el stock en negativo (${nuevoStock}). No hay suficientes existencias.`);
+    }
+
+    // 4. ACTUALIZAR EL STOCK DEL ARTÍCULO EN EL CATÁLOGO
+    const listaArticulos = DB.getArticles();
+    const articulosActualizados = listaArticulos.map(art => {
+        if (art.codigo === currentStockArticleCode) {
+            return { ...art, stock: nuevoStock };
+        }
+        return art;
+    });
+    DB.saveArticles(articulosActualizados);
+
+    // 5. REGISTRAR EL MOVIMIENTO DE AUDITORÍA (KARDEX)
+    const historialLog = DB.getInventoryLog();
+    const nuevoRegistroLog = {
+        id: Date.now().toString(),
+        fecha: new Date().toISOString(),
+        usuario: currentUser?.user || 'Administrador', // Contexto de tu sesión activa
+        codigo: currentStockArticleCode,
+        tipo_movimiento: typeIn,
+        cantidad_movida: qtyIn,
+        stock_anterior: currentStock,
+        stock_actualizado: nuevoStock,
+        motivo: reasonIn
+    };
+    
+    historialLog.unshift(nuevoRegistroLog); // Inserta al principio para ver lo más nuevo primero
+    DB.saveInventoryLog(historialLog);
+
+    alert(`Movimiento aplicado con éxito.\nNuevo stock de la prenda: ${nuevoStock} unidades.`);
+    
+    // 6. Cerrar modal y actualizar la tabla visual en tu pantalla
+    cerrarModalStock();
+    renderArticles();
+}
+
+function cerrarModalStock() {
+    document.getElementById('modal-stock-adjust').classList.add('hidden');
+    currentStockArticleCode = null;
+}
+
