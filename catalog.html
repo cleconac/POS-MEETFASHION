@@ -64,6 +64,50 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Exclusiva para Ajuste de Inventario -->
+<div id="modal-stock-adjust" class="modal hidden">
+   <div class="modal-content" style="max-width: 450px;">
+      <h3 id="stock-modal-title">Movimiento de Inventario</h3>
+      <p id="stock-modal-sku" style="font-weight: bold; color: #555;"></p>
+      
+
+<div class="form-row" style="display: flex; gap: 10px; margin-bottom: 15px;">
+    <div style="flex: 1;">
+        <label>Stock Actual</label>
+        <!-- Forzamos el ID st-current, valor inicial en 0 y modo lectura -->
+        <input id="st-current" type="number" readonly value="0" style="background: #eee; width: 100%; color: #333; font-weight: bold;">
+    </div>
+    <div style="flex: 1;">
+        <label>Cantidad a Mover *</label>
+        <input id="st-qty" type="number" min="1" placeholder="Ej: 5, 10" style="width: 100%;">
+    </div>
+</div>
+
+
+      <div class="form-row" style="margin-bottom: 15px;">
+          <label>Tipo de Operación *</label>
+          <select id="st-type" style="width: 100%;">
+              <option value="entrada_surtido">📈 Entrada - Surtido de Mercancía</option>
+              <option value="entrada_traspaso">🔄 Entrada - Traspaso de Tienda</option>
+              <option value="salida_traspaso">🔄 Salida - Traspaso de Tienda</option>
+              <option value="ajuste_auditoria">🔧 Ajuste - Conteo / Auditoría</option>
+              <option value="salida_merma">📉 Salida - Artículo Dañado / Merma</option>
+          </select>
+      </div>
+
+      <div class="form-row" style="margin-bottom: 15px;">
+          <label>Motivo / Comentarios Breves *</label>
+          <input id="st-reason" placeholder="Ej: Recibido de sucursal centro..." style="width: 100%;">
+      </div>
+
+      <div class="form-row" style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn" onclick="guardarAjusteInventario()">Aplicar Movimiento</button>
+          <button class="btn alt" onclick="cerrarModalStock()">Cancelar</button>
+      </div>
+   </div>
+</div>
+
 <script  src="auth.js"></script>
 <script>requireRole('admin');</script>
 <script src="db.js"></script>
