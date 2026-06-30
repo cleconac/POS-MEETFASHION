@@ -5,48 +5,62 @@ let currentPage  =  1;
 const  pageSize =  20;  //  artículos  por página
 let  filteredData  =  [];
 
-function  cargarCatalogo(page  =  1) {
-       const  q  =  document.getElementById("search-cat")?.value.trim().toLowerCase()  || "";
-       const  allData  =  DB.getArticles();
+function cargarCatalogo(page = 1) {
+       const q = document.getElementById("search-cat")?.value.trim().toLowerCase() || "";
+       const allData = DB.getArticles();
 
-       // Filtrar  por  búsqueda
-       filteredData  =  q
-              ?  allData.filter(a =>
-                      a.nombre.toLowerCase().includes(q)  ||
-                     a.codigo.toLowerCase().includes(q)
+       // 1. Filtrar por búsqueda de forma limpia
+       filteredData = q
+              ? allData.filter(a =>
+                      a.nombre.toLowerCase().includes(q) ||
+                      a.codigo.toLowerCase().includes(q)
               )
-              :  allData;
+              : allData;
 
-       //  Paginación
-       const  totalPages =  Math.ceil(filteredData.length  /  pageSize);
-       currentPage  = Math.min(page,  totalPages);
+       // 2. Control estricto de Paginación Matemática
+       const totalPages = Math.ceil(filteredData.length / pageSize);
+       currentPage = Math.min(page, totalPages);
+       if (currentPage < 1) currentPage = 1;
 
-       const  start  = (currentPage  -  1)  *  pageSize;
-       const end  =  start  +  pageSize;
-       const data  =  filteredData.slice(start,  end);
+       const start = (currentPage - 1) * pageSize;
+       const end = start + pageSize;
+       
+       // 'data' contiene ÚNICAMENTE los 20 artículos que se ven en la pantalla actual
+       const data = filteredData.slice(start, end);
 
-       const body  =  document.getElementById("catBody");
-       body.innerHTML  =  "";
+       const body = document.getElementById("catBody");
+       if (!body) return;
+       body.innerHTML = "";
 
-       data.forEach(a  =>  {
-              const  tr  =  document.createElement("tr");
-              tr.innerHTML  = `
-                      <td>${a.codigo}</td>
+       // 3. GENERAR FILAS: Forzamos el uso estricto del ID único de cada prenda de ropa
+       data.forEach(a => {
+              const tr = document.createElement("tr");
+              
+              // Resguardo bilingüe por si tu base de datos guarda .id o ._id
+              const idUnicoReal = a.id || a.codigo || ''; 
+              const stockSeguro = typeof a.stock !== 'undefined' ? a.stock : 0;
+
+              tr.innerHTML = `
+                     <td>${a.codigo}</td>
                      <td>${a.nombre}</td>
-                      <td>${mxn(a.precio)}</td>
-                     <td>${a.stock}</td>
+                     <td>${mxn ? mxn(a.precio) : '$' + Number(a.precio).toFixed(2)}</td>
+                     <td>${stockSeguro}</td>
                      <td>
-                            <button  class="btn-primary"  onclick="editar('${a.id}')">Editar</button>
-                            <button  class="btn-sec"  onclick="eliminar('${a.id}')">Eliminar</button>
-			    <button class="btn-sec" onclick="openStockModal('${a.id}')">📋 Stock</button>
-
+                            <!-- 🔥 CORRECCIÓN CRÍTICA: Forzamos a que el onclick use el ID exacto de esta iteración -->
+                            <button class="btn-primary" onclick="editar('${idUnicoReal}')">Editar</button>
+                            <button class="btn-sec" onclick="eliminar('${idUnicoReal}')">Eliminar</button>
+                            <button class="btn-sec" onclick="openStockModal('${idUnicoReal}')">📋 Stock</button>
                      </td>
               `;
-               body.appendChild(tr);
+              body.appendChild(tr);
        });
 
-       renderPagination(totalPages);
+       // Renderizar los botones de las páginas abajo
+       if (typeof renderPagination === "function") {
+           renderPagination(totalPages);
+       }
 }
+
 
 function  renderPagination(totalPages)  {
     const  container  = document.getElementById("pagination");
@@ -250,45 +264,64 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-// Variable global para recordar qué artículo estamos alterando
+// Variable global única y blindada
 let currentStockArticleCode = null;
 
-// Función que se activa al presionar tu nuevo botón de Stock en la tabla
 function openStockModal(idArticulo) {
+    // 1. Extraer los datos reales directo de tu LocalStorage mediante tu objeto DB
     const articulo = DB.getArticles().find(a => a.id === idArticulo);
     if (!articulo) return alert("Artículo no encontrado.");
 
-    // Guardamos el ID único en la variable global
-    currentStockArticleCode = idArticulo; 
+    // 2. Anclar el ID único en la memoria global del script
+    currentStockArticleCode = idArticulo;
     
-    // Inyección de textos informativos en las etiquetas de la modal
+    // 3. Procesar matemáticamente las existencias registradas (si es undefined, se vuelve 0)
+    const stockReal = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
+
+    // 4. Inyectar de forma directa los textos descriptivos a la interfaz
     document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
     document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
     
-    // 🔥 CORRECCIÓN CRÍTICA: Cambiado 'stock' por 'articulo.stock' para leer el valor real
-    const stockReal = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
-    document.getElementById('st-current').value = stockReal;
+    // 5. BLINDAJE UX/UI: Localizar el input por cualquiera de sus variantes y FORZAR el número real
+    const inputStock = document.getElementById('inventory-modal-stock') || document.getElementById('st-current');
+    if (inputStock) {
+        inputStock.value = stockReal; // Aquí se sobrescribe y destruye cualquier 1000 fantasma
+    }
     
-    // Limpieza de inputs de captura para el nuevo movimiento
-    document.getElementById('st-qty').value = '';
-    document.getElementById('st-reason').value = '';
-    document.getElementById('st-type').selectedIndex = 0;
+    // 6. Blanquear rigurosamente los campos de entrada de datos para el nuevo movimiento
+    const inputsCaptura = ['inventory-modal-qty', 'st-qty', 'inventory-modal-reason', 'st-reason'];
+    inputsCaptura.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 
-    // Mostrar modal removiendo la clase hidden
-    document.getElementById('modal-stock-adjust').classList.remove('hidden');
+    const selectorTipo = document.getElementById('inventory-modal-type') || document.getElementById('st-type');
+    if (selectorTipo) selectorTipo.selectedIndex = 0;
+
+    // 7. Desplegar el modal removiendo la propiedad de ocultación
+    const modal = document.getElementById('modal-stock-adjust');
+    if (modal) modal.classList.remove('hidden');
 }
 
-
-
-
-// Función encargada de procesar, guardar y auditar el movimiento de inventario
 function guardarAjusteInventario() {
-    const qtyIn = parseInt(document.getElementById('st-qty').value);
-    const typeIn = document.getElementById('st-type').value;
-    const reasonIn = document.getElementById('st-reason').value.trim();
-    const currentStock = parseInt(document.getElementById('st-current').value || 0);
+    // 1. Capturar cantidades de forma flexible evaluando ambas nomenclaturas de ID
+    const inputQty = document.getElementById('inventory-modal-qty') || document.getElementById('st-qty');
+    const inputType = document.getElementById('inventory-modal-type') || document.getElementById('st-type');
+    const inputReason = document.getElementById('inventory-modal-reason') || document.getElementById('st-reason');
 
-    // 1. Candados de validación obligatorios
+    const qtyIn = parseInt(inputQty ? inputQty.value : 0);
+    const typeIn = inputType ? inputType.value : "entrada_surtido";
+    const reasonIn = inputReason ? inputReason.value.trim() : "";
+
+    // 2. Ir directo a la DB usando la variable global segura (Evitamos leer el st-current del HTML)
+    const listaArticulos = DB.getArticles();
+    const articulo = listaArticulos.find(a => a.id === currentStockArticleCode);
+    if (!articulo) return alert("Error interno: No se pudo identificar el artículo seleccionado.");
+
+    // 3. Tomar el stock original directo de la base de datos local en memoria
+    const currentStock = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
+
+    // 4. Validaciones obligatorias de negocio
     if (!qtyIn || qtyIn <= 0 || isNaN(qtyIn)) {
         return alert("Por favor, ingresa una cantidad válida mayor a cero.");
     }
@@ -296,19 +329,16 @@ function guardarAjusteInventario() {
         return alert("Por favor, describe detalladamente el motivo del movimiento.");
     }
 
-    // 2. Evaluar si la operación es una salida de mercancía para restar
+    // 5. Calcular aritméticamente si la operación suma o resta
     const esSalida = typeIn.includes('salida');
     let nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
 
-    // 3. Control de inventario en negativo
     if (nuevoStock < 0) {
-        return alert(`Operación cancelada: El ajuste dejaría el stock en negativo (${nuevoStock}). No hay suficientes existencias.`);
+        return alert(`Operación cancelada: El ajuste dejaría el stock en negativo (${nuevoStock}). No hay unidades suficientes.`);
     }
 
-    // 4. ACTUALIZAR EL STOCK DEL ARTÍCULO EN EL CATÁLOGO
-    const listaArticulos = DB.getArticles();
+    // 6. ACTUALIZAR EL CATÁLOGO EN TU LOCALSTORAGE
     const articulosActualizados = listaArticulos.map(art => {
-        // Comparamos usando .id de forma exacta
         if (art.id === currentStockArticleCode) { 
             return { ...art, stock: nuevoStock };
         }
@@ -316,14 +346,13 @@ function guardarAjusteInventario() {
     });
     DB.saveArticles(articulosActualizados);
 
-
-    // 5. REGISTRAR EL MOVIMIENTO DE AUDITORÍA (KARDEX)
+    // 7. REGISTRAR EL MOVIMIENTO EN EL HISTORIAL (KARDEX)
     const historialLog = DB.getInventoryLog();
     const nuevoRegistroLog = {
         id: Date.now().toString(),
         fecha: new Date().toISOString(),
-        usuario: currentUser?.user || 'Administrador', // Contexto de tu sesión activa
-        codigo: currentStockArticleCode,
+        usuario: currentUser?.user || 'Administrador',
+        id_articulo: currentStockArticleCode,
         tipo_movimiento: typeIn,
         cantidad_movida: qtyIn,
         stock_anterior: currentStock,
@@ -331,15 +360,17 @@ function guardarAjusteInventario() {
         motivo: reasonIn
     };
     
-    historialLog.unshift(nuevoRegistroLog); // Inserta al principio para ver lo más nuevo primero
+    historialLog.unshift(nuevoRegistroLog);
     DB.saveInventoryLog(historialLog);
 
-    alert(`Movimiento aplicado con éxito.\nNuevo stock de la prenda: ${nuevoStock} unidades.`);
+    alert(`¡Movimiento aplicado con éxito!\nNuevo stock: ${nuevoStock} unidades.`);
     
-    // 6. Cerrar modal y actualizar la tabla visual en tu pantalla
+    // 8. Ocultar modal y refrescar la tabla dinámica con paginación
     cerrarModalStock();
-    renderArticles();
+    cargarCatalogo(); 
 }
+
+
 
 function cerrarModalStock() {
     document.getElementById('modal-stock-adjust').classList.add('hidden');
