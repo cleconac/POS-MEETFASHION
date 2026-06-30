@@ -258,25 +258,26 @@ function openStockModal(idArticulo) {
     const articulo = DB.getArticles().find(a => a.id === idArticulo);
     if (!articulo) return alert("Artículo no encontrado.");
 
-    // Guardar el identificador para el proceso de guardado
-    currentStockArticleCode = articulo.id || articulo.codigo; 
+    // Guardamos el ID único en la variable global
+    currentStockArticleCode = idArticulo; 
     
-    // INYECCIÓN DE DATOS CORREGIDA:
+    // Inyección de textos informativos en las etiquetas de la modal
     document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
     document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
     
-    // Forzamos a que extraiga el stock real de la tabla y lo inyecte en el input st-current
+    // 🔥 CORRECCIÓN CRÍTICA: Cambiado 'stock' por 'articulo.stock' para leer el valor real
     const stockReal = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
     document.getElementById('st-current').value = stockReal;
     
-    // Limpieza estricta de los campos de captura para cada apertura nueva
+    // Limpieza de inputs de captura para el nuevo movimiento
     document.getElementById('st-qty').value = '';
     document.getElementById('st-reason').value = '';
     document.getElementById('st-type').selectedIndex = 0;
 
-    // Mostrar modal
+    // Mostrar modal removiendo la clase hidden
     document.getElementById('modal-stock-adjust').classList.remove('hidden');
 }
+
 
 
 
@@ -307,12 +308,14 @@ function guardarAjusteInventario() {
     // 4. ACTUALIZAR EL STOCK DEL ARTÍCULO EN EL CATÁLOGO
     const listaArticulos = DB.getArticles();
     const articulosActualizados = listaArticulos.map(art => {
-        if (art.codigo === currentStockArticleCode) {
+        // Comparamos usando .id de forma exacta
+        if (art.id === currentStockArticleCode) { 
             return { ...art, stock: nuevoStock };
         }
         return art;
     });
     DB.saveArticles(articulosActualizados);
+
 
     // 5. REGISTRAR EL MOVIMIENTO DE AUDITORÍA (KARDEX)
     const historialLog = DB.getInventoryLog();
