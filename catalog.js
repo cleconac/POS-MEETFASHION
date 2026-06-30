@@ -36,8 +36,10 @@ function  cargarCatalogo(page  =  1) {
                       <td>${mxn(a.precio)}</td>
                      <td>${a.stock}</td>
                      <td>
-                             <button  class="btn-primary"  onclick="editar('${a.id}')">Editar</button>
+                            <button  class="btn-primary"  onclick="editar('${a.id}')">Editar</button>
                             <button  class="btn-sec"  onclick="eliminar('${a.id}')">Eliminar</button>
+                            <button  class="btn-sec"  onclick="stock('${a.id}')">📋 Stock</button>
+
                      </td>
               `;
                body.appendChild(tr);
@@ -90,9 +92,11 @@ function abrirNuevo() {
     editId = null;
     document.getElementById("modalTitle").textContent = "Nuevo Artículo";
     document.getElementById("cod").value = "";
+    document.getElementById("cod").readOnly = false;
     document.getElementById("nom").value = "";
     document.getElementById("pre").value = "";
     document.getElementById("sto").value = "";
+    document.getElementById("sto").readOnly = false;
     document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -104,9 +108,11 @@ function editar(id) {
     document.getElementById("modalTitle").textContent = "Editar Artículo";
 
     document.getElementById("cod").value = art.codigo;
+    document.getElementById("cod").readOnly = true;
     document.getElementById("nom").value = art.nombre;
     document.getElementById("pre").value = art.precio;
     document.getElementById("sto").value = art.stock;
+    document.getElementById("sto").readOnly = true;
 
     document.getElementById("modal").classList.remove("hidden");
 }
@@ -135,6 +141,90 @@ function guardarArticulo() {
     cerrarModal();
     cargarCatalogo();
 }
+
+let currentStockArticleCode = null; // Guarda el código del artículo seleccionado
+
+function abrirModalStock(codigoArticulo) {
+    const articulo = DB.getArticles().find(a => a.codigo === codigoArticulo);
+    if (!articulo) return;
+
+    currentStockArticleCode = codigoArticulo;
+    
+    // Rellenar etiquetas e inputs informativos
+    document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
+    document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
+    document.getElementById('st-current').value = articulo.stock || 0;
+    
+    // Limpiar campos de captura
+    document.getElementById('st-qty').value = '';
+    document.getElementById('st-reason').value = '';
+    document.getElementById('st-type').selectedIndex = 0;
+
+    document.getElementById('modal-stock-adjust').classList.remove('hidden');
+}
+
+//El sistema calculará el nuevo stock sumando o restando automáticamente según el tipo de operación, capturando al usuario logueado en la sesión activa
+
+function guardarAjusteInventario() {
+    const qtyIn = parseInt(document.getElementById('st-qty').value);
+    const typeIn = document.getElementById('st-type').value;
+    const reasonIn = document.getElementById('st-reason').value.trim();
+    const currentStock = parseInt(document.getElementById('st-current').value || 0);
+
+    // 1. Validaciones obligatorias de seguridad
+    if (!qtyIn || qtyIn <= 0 || isNaN(qtyIn)) return alert("Ingresa una cantidad válida mayor a cero.");
+    if (!reasonIn) return alert("Por favor, describe el motivo detallado del movimiento.");
+
+    // Recuperar usuario logueado de la sesión activa
+    const userSession = JSON.parse(sessionStorage.getItem('pos_user')) || { user: 'Desconocido' };
+
+    // 2. Determinar si el movimiento suma o resta al inventario
+    const esSalida = typeIn.includes('salida');
+    let nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
+
+    if (nuevoStock < 0) {
+        return alert(`Operación inválida: El ajuste dejaría el stock en negativo (${nuevoStock}). Verifica las unidades.`);
+    }
+
+    // 3. ACTUALIZAR EL ARTÍCULO EN EL CATÁLOGO
+    const listaArticulos = DB.getArticles();
+    const articulosActualizados = listaArticulos.map(art => {
+        if (art.codigo === currentStockArticleCode) {
+            return { ...art, stock: nuevoStock };
+        }
+        return art;
+    });
+    DB.saveArticles(articulosActualizados);
+
+    // 4. CREAR EL REGISTRO DE AUDITORÍA (KARDEX)
+    const historialLog = DB.getInventoryLog();
+    const nuevoRegistroLog = {
+        id: Date.now().toString(),
+        fecha: new Date().toISOString(),
+        usuario: userSession.user,
+        codigo: currentStockArticleCode,
+        tipo_movimiento: typeIn,
+        cantidad_movida: qtyIn,
+        stock_anterior: currentStock,
+        stock_actualizado: nuevoStock,
+        motivo: reasonIn
+    };
+    
+    historialLog.unshift(nuevoRegistroLog); // Añade al inicio del historial
+    DB.saveInventoryLog(historialLog);
+
+    alert(`¡Movimiento aplicado con éxito! Nuevo stock: ${nuevoStock} unidades.`);
+    
+    // 5. Limpieza de UI
+    cerrarModalStock();
+    if (typeof renderArticles === "function") renderArticles(); // Refresca tu tabla de artículos
+}
+
+function cerrarModalStock() {
+    document.getElementById('modal-stock-adjust').classList.add('hidden');
+    currentStockArticleCode = null;
+}
+
 
 // ---------- ELIMINAR ----------
 function eliminar(id) {
