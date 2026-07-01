@@ -35,6 +35,7 @@ const el = {
   btnClear: document.getElementById('btn-clear'), // puede ser null
   btnOpenCatalog: document.getElementById('btn-open-catalog'),
   btnOpenReports: document.getElementById('btn-open-reports'),
+  btnOpenStations: document.getElementById('btn-stations'),
   modalCatalog: document.getElementById('modal-catalog'),
   catalogList: document.getElementById('catalog-list'),
   btnCloseCatalog: document.getElementById('btn-close-catalog'),
@@ -75,6 +76,48 @@ const el = {
 function showLoginScreen(){ document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('login-user').focus(); }
 function hideLoginScreen(){ document.getElementById('login-screen').classList.add('hidden'); }
 
+// PEGA ESTO EN SU LUGAR:
+document.getElementById('login-ok').addEventListener('click', () => {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const stationSeleccionada = document.getElementById('login-station').value || 'Principal';
+  
+  if (!u || !p) {
+      alert('Por favor, introduce tu usuario y contraseña.');
+      return;
+  }
+
+  const users = DB.getUsers ? DB.getUsers() : [];
+  const usuarioEncontrado = users.find(x => x.user === u || x.usuario === u);
+  
+  if (!usuarioEncontrado) {
+      alert('El usuario introducido no existe o no está registrado.');
+      return;
+  }
+
+  if (usuarioEncontrado.pass !== p) {
+      alert('La contraseña introducida es incorrecta. Inténtalo de nuevo.');
+      return;
+  }
+
+  const estacionAsignada = usuarioEncontrado.estacion || usuarioEncontrado.station || 'Principal';
+
+  if (estacionAsignada.trim().toLowerCase() !== stationSeleccionada.trim().toLowerCase()) {
+      alert(`⚠️ ACCESO DENEGADO:\nEl usuario "${u}" está asignado exclusivamente a la estación "${estacionAsignada}".\nNo tienes autorización para operar en la estación "${stationSeleccionada}".`);
+      return;
+  }
+
+  usuarioEncontrado.station = estacionAsignada;
+  usuarioEncontrado.turno = usuarioEncontrado.turno || usuarioEncontrado.shift || '—';
+  
+  sessionStorage.setItem('estacion-activa', estacionAsignada);
+  
+  setUserContext(usuarioEncontrado);
+  applyPermissions(usuarioEncontrado);
+  hideLoginScreen();
+});
+
+
 function setUserContext(user){
   currentUser = user;
   sessionStorage.setItem('pos_user', JSON.stringify(user));
@@ -111,22 +154,6 @@ function setUserContext(user){
     });
  }
 
-
-// Botones login
-document.getElementById('login-ok').addEventListener('click', ()=> {
-  const u = document.getElementById('login-user').value.trim();
-  const p = document.getElementById('login-pass').value;
-  const station = document.getElementById('login-station').value || 'Principal';
-  const users = DB.getUsers ? DB.getUsers() : [];
-  const found = users.find(x => x.user === u && x.pass === p);
-  if(!found){ alert('Credenciales inválidas'); return; }
-  found.station = station;
-  // Si  el  usuario  ya tiene  turno  configurado  en users.html,  úsalo  directamente
-  found.turno =  found.turno  ||  found.shift ||  '—';
-  setUserContext(found);
-  applyPermissions(found);
-  hideLoginScreen();
-});
 document.getElementById('login-cancel').addEventListener('click', ()=> {
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
@@ -194,6 +221,42 @@ function actualizarTicketDisplay() {
         el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
     }
 }
+
+
+// Función para cargar las estaciones creadas por el Administrador en el Login
+function cargarEstacionesEnLogin() {
+    const selectStation = document.getElementById("login-station");
+    if (!selectStation) return;
+
+    // 1. Obtener el catálogo de estaciones usando tu función central de db.js
+    const estaciones = DB.getStations ? DB.getStations() : (JSON.parse(localStorage.getItem("pos_stations")) || []);
+
+    // 2. Limpiar la opción fija anterior del HTML
+    selectStation.innerHTML = "";
+
+    // 3. Si por alguna razón está vacío el catálogo, creamos una opción de respaldo
+    if (estaciones.length === 0) {
+        const option = document.createElement("option");
+        option.value = "Principal";
+        option.textContent = "Principal";
+        selectStation.appendChild(option);
+        return;
+    }
+
+    // 4. Inyectar dinámicamente cada estación real en el selector del Login
+    estaciones.forEach(est => {
+        const option = document.createElement("option");
+        option.value = est.nombre; // Guardamos el nombre ("Salto del Agua", "Principal", etc.)
+        option.textContent = est.nombre; // Texto visible para el usuario
+        selectStation.appendChild(option);
+    });
+}
+
+// Forzar a que las estaciones se carguen al abrir el Punto de Venta
+document.addEventListener("DOMContentLoaded", () => {
+    cargarEstacionesEnLogin();
+});
+
 
 // --- RENDER resultados (lista) ---
 // Nota: renderResults sigue escribiendo en #results (oculto por defecto).
@@ -264,8 +327,8 @@ document.addEventListener("keydown",  e  =>  {
        const  current =  items[indexCart];
        if  (!current)  return;
 
-       // Delete  o  Backspace  →  reducir o  eliminar
-       if  (e.key  ===  "Delete" ||  e.key  ===  "Backspace" || e.key === "-")  {
+       // reducir o  eliminar cantidad de un articulo
+       if  (e.key === "-")  {
           const  idx  =  parseInt(current.dataset.index, 10);
            const  it  = cart[idx];
            if  (it)  {
@@ -287,7 +350,7 @@ document.addEventListener("keydown",  e  =>  {
        }
 
        // aumentar cantidad de producto
-       if  (e.key  ===  "Enter" ||  e.key === "+")  {
+       if  (e.key === "+")  {
           const  idx  =  parseInt(current.dataset.index, 10);
            const  it  = cart[idx];
            if  (it)  {
@@ -699,6 +762,7 @@ if (el.btnClear) {
 // --- Modal catálogo (botones) ---
 if (el.btnOpenCatalog) el.btnOpenCatalog.addEventListener('click', ()=> window.location.href = "catalog.html");
 if (el.btnOpenReports) el.btnOpenReports.addEventListener('click', ()=> window.location.href = "reportes.html");
+if (el.btnOpenStations) el.btnOpenStations.addEventListener('click', ()=> window.location.href = "estaciones.html");
 if (el.btnCloseCatalog) el.btnCloseCatalog.addEventListener('click', ()=> el.modalCatalog && el.modalCatalog.classList.add('hidden'));
 
 function renderCatalogModal(){
@@ -811,6 +875,12 @@ document.addEventListener("keydown", (event) => {
             modalCor.classList.add("hidden");
         }
 
+	const modalLogout = document.getElementById("modal-logout");
+        if (modalLogout && !modalLogout.classList.contains("hidden")) {
+            // Cerrar modal
+            modalLogout.classList.add("hidden");
+        }
+
     }
 });
 
@@ -904,7 +974,7 @@ document.getElementById('btn-corte')?.addEventListener('click',  ()  =>  {
 
     const onYes = () => {
     document.getElementById('modal-corte').classList.add('hidden');
-    const  cashierId  =  sessionStorage.getItem('pos_cashier')  ||  'Terminal1';
+    const  cashierId  =  sessionStorage.getItem('pos_cashier');
     const  now =  new  Date();
 
     //  Desde:  el  último  corte;  si  no  existe,  inicio  del  día
@@ -963,8 +1033,8 @@ ventasPeriodo.forEach(v  =>  {
     //  Construir  HTML  del  corte
     let  html  =  `<div  style="padding:12px">
         <h2>Corte  -  ${now.toLocaleString()}</h2>
-        <div>Estación:  ${sessionStorage.getItem('estacion-activa')  ||  'Principal'}</div>
-        <div>	:  ${cashierId}</div>
+        <div>Estación:  ${sessionStorage.getItem('estacion-activa')}</div>
+        <div>Usuario	:  ${cashierId}</div>
         <div>Turno:  ${currentUser?.turno  || '—'}</div>
         <div>Periodo:  ${desde.toLocaleString()}  →  ${hasta.toLocaleString()}</div>
         <hr>
