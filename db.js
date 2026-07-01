@@ -157,4 +157,36 @@ DB.getSaleByTicket = function(ticket){
   return ventas.find(v => Number(v.ticket) === Number(ticket));
 };
 
+// Obtener estaciones
+DB.getStations = function(){
+    const data = localStorage.getItem('pos_stations');
+   // Si está vacío, creamos una por defecto para que el sistema nunca falle
+   if (!data) {
+        const defaultStations = [{ id: "1", nombre: "Principal", activa: true }];
+        localStorage.setItem('pos_stations', JSON.stringify(defaultStations));
+        return defaultStations;
+    }
+    return JSON.parse(data);
+};
+
+// Guardar estaciones
+DB.saveStations = function(stationsList) {
+    localStorage.setItem('pos_stations', JSON.stringify(stationsList));
+};
+
+DB.deleteStations = function(station){
+  const list = DB.getStations().filter(x=>x.station!==station);
+  DB.saveStations(list);
+};
+
+
+// Obtener el historial de movimientos de inventario
+DB.getInventoryLog = function() {
+    return JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+};
+
+// Guardar un nuevo registro en el historial
+DB.saveInventoryLog = function(logList) {
+    localStorage.setItem('pos_inventory_log', JSON.stringify(logList));
+};
 
