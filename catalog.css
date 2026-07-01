@@ -261,3 +261,104 @@ h2 {
 .btn-sec:hover {
     background: #d5d5d5;
 }
+
+/* 1. HOMOLOGAR ESTILO DE LETRA EN TODA LA TABLA */
+.cat-table th {
+    padding: 14px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057; /* Un color gris oscuro más profesional */
+    border-bottom: 2px solid #dee2e6;
+    text-transform: uppercase; /* Hace que los encabezados se vean más estéticos */
+    letter-spacing: 0.5px;
+}
+
+.cat-table td {
+    padding: 14px;
+    font-size: 14px; /* Homologamos el tamaño exacto del texto */
+    color: #333333;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle; /* Centra verticalmente el contenido con los botones */
+}
+
+/* 2. ESTILIZAR LAS NUEVAS COLUMNAS DE AUDITORÍA */
+.cat-table td span.audit-date {
+    font-size: 13px;
+    color: #6c757d;
+    font-variant-numeric: tabular-nums; /* Hace que los números de la fecha no bailen */
+}
+
+.cat-table td span.audit-user {
+    font-weight: 600;
+    color: #495057;
+    background: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* 3. ALINEACIÓN ABSOLUTA DE BOTONES DE ACCIÓN EN UNA SOLA FILA */
+.cat-table td:last-child {
+    display: flex; /* Forzamos un contenedor flexible */
+    align-items: center;
+    gap: 6px; /* Espaciado exacto y uniforme entre cada botón */
+    border-bottom: none; /* Evita que el flex duplique bordes */
+    min-width: 260px; /* Asegura un ancho mínimo para que NUNCA se bajen de renglón */
+}
+
+/* Ajuste de tamaño uniforme para los botones dentro de la tabla */
+.cat-table .btn-primary,
+.cat-table .btn-sec {
+    margin: 0 !important; /* Removemos márgenes viejos que empujaban los botones */
+    padding: 6px 12px;
+    font-size: 13px;
+    height: 32px; /* Forzamos la misma altura para los tres */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+/* Espaciado para la X nativa del buscador */
+#search-cat::-webkit-search-cancel-button {
+    cursor: pointer;
+    position: relative;
+    right: 5px;
+    padding: 4px;
+}
+
+/* ========================================================
+   ESTILOS DE TABLA CON CENTRADO ABSOLUTO Y SIMÉTRICO
+   ======================================================== */
+
+.cat-table th {
+    padding: 14px;
+    text-align: center; /* 🔥 CORRECCIÓN: Centra perfectamente los títulos superiores */
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cat-table td {
+    padding: 14px;
+    font-size: 14px;
+    color: #333333;
+    border-bottom: 1px solid #f1f3f5;
+    text-align: center; /* 🔥 CORRECCIÓN: Centra de forma simétrica todos los datos de abajo */
+    vertical-align: middle; /* Mantiene alineados los textos con los botones */
+}
+
+/* Conservamos la celda de las acciones flexible para que tus 4 botones sigan en una sola línea */
+.cat-table td:last-child {
+    display: flex;
+    align-items: center;
+    justify-content: center; /* 🔥 CORRECCIÓN: Centra la tira de botones bajo el título ACCIONES */
+    gap: 6px;
+    border-bottom: none;
+    min-width: 320px; /* Asegura el espacio suficiente para tus 4 botones alineados */
+}
+
