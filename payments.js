@@ -93,8 +93,10 @@ export function initPayments(getCartFn, clearCartFn, onSaleDone) {
             payments: { efectivo: cash, tarjeta: card, transferencia: transfer },
             pagado: totalPagado,
             cambio: cambio >= 0 ? cambio : 0,
-            cashier: localStorage.getItem('pos_cashier') || 'Terminal1'
-        };
+            // 2. SOLUCIÓN DE IDENTIDAD: Forzamos la lectura unificada desde SessionStorage
+            cashier: sessionStorage.getItem('pos_cashier'),
+            vendedor: sessionStorage.getItem('pos_cashier'),
+            usuario: sessionStorage.getItem('pos_cashier')        };
 
         // ajuste stock si existe
         const artList = DB.getArticles();
