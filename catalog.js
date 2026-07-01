@@ -9,7 +9,6 @@ function cargarCatalogo(page = 1) {
        const q = document.getElementById("search-cat")?.value.trim().toLowerCase() || "";
        const allData = DB.getArticles();
 
-       // 1. Filtrar por búsqueda de forma limpia
        filteredData = q
               ? allData.filter(a =>
                       a.nombre.toLowerCase().includes(q) ||
@@ -17,83 +16,99 @@ function cargarCatalogo(page = 1) {
               )
               : allData;
 
-       // 2. Control estricto de Paginación Matemática
        const totalPages = Math.ceil(filteredData.length / pageSize);
        currentPage = Math.min(page, totalPages);
        if (currentPage < 1) currentPage = 1;
 
        const start = (currentPage - 1) * pageSize;
        const end = start + pageSize;
-       
-       // 'data' contiene ÚNICAMENTE los 20 artículos que se ven en la pantalla actual
        const data = filteredData.slice(start, end);
 
        const body = document.getElementById("catBody");
        if (!body) return;
        body.innerHTML = "";
 
-       // 3. GENERAR FILAS: Forzamos el uso estricto del ID único de cada prenda de ropa
        data.forEach(a => {
               const tr = document.createElement("tr");
-              
-              // Resguardo bilingüe por si tu base de datos guarda .id o ._id
-              const idUnicoReal = a.id || a.codigo || ''; 
               const stockSeguro = typeof a.stock !== 'undefined' ? a.stock : 0;
+              
+              // Formatear fecha legible o poner un guion si no ha sido modificado
+              const fechaLegible = a.ultimo_movimiento ? new Date(a.ultimo_movimiento).toLocaleString() : '—';
+              const usuarioUltimo = a.usuario_movimiento || '—';
 
-              tr.innerHTML = `
-                     <td>${a.codigo}</td>
-                     <td>${a.nombre}</td>
-                     <td>${mxn ? mxn(a.precio) : '$' + Number(a.precio).toFixed(2)}</td>
-                     <td>${stockSeguro}</td>
-                     <td>
-                            <!-- 🔥 CORRECCIÓN CRÍTICA: Forzamos a que el onclick use el ID exacto de esta iteración -->
-                            <button class="btn-primary" onclick="editar('${idUnicoReal}')">Editar</button>
-                            <button class="btn-sec" onclick="eliminar('${idUnicoReal}')">Eliminar</button>
-                            <button class="btn-sec" onclick="openStockModal('${idUnicoReal}')">📋 Stock</button>
-                     </td>
-              `;
+// Busca esta sección dentro del data.forEach de tu cargarCatalogo() y actualiza las celdas:
+tr.innerHTML = `
+       <td>${a.codigo}</td>
+       <td>${a.nombre}</td>
+       <td>${mxn ? mxn(a.precio) : '$' + Number(a.precio).toFixed(2)}</td>
+       <td><strong>${stockSeguro}</strong></td>
+       
+       <!-- Añadidas las clases CSS para homologar los textos -->
+       <td><span class="audit-date">${fechaLegible}</span></td>
+       <td><span class="audit-user">${usuarioUltimo}</span></td>
+       
+       <td>
+              <button class="btn-primary" onclick="editar('${a.codigo}')">Editar</button>
+              <button class="btn-sec" onclick="eliminar('${a.codigo}')">Eliminar</button>
+              <button class="btn-sec" onclick="openStockModal('${a.codigo}')">📋 Stock</button>
+              <!-- 🔥 MEJORA DE GESTIÓN: Botón para ver todas las fechas de movimiento -->
+              <button class="btn-sec" onclick="verHistorialArticulo('${a.codigo}')" title="Ver Historial de Cambios">⏳ Historial</button>
+       </td>
+`;
               body.appendChild(tr);
        });
 
-       // Renderizar los botones de las páginas abajo
        if (typeof renderPagination === "function") {
            renderPagination(totalPages);
        }
 }
 
 
-function  renderPagination(totalPages)  {
-    const  container  = document.getElementById("pagination");
-    if  (!container)  return;
-   container.innerHTML  =  "";
+function renderPagination(totalPages) {
+       const nav = document.getElementById("pagination");
+       if (!nav) return;
+       nav.innerHTML = "";
 
-    if  (currentPage >  1)  {
-        const prev  =  document.createElement("button");
-        prev.textContent =  "←";
-        prev.addEventListener("click",  () =>  cargarCatalogo(currentPage  -  1));
-       container.appendChild(prev);
-    }
+       if (totalPages <= 1) return;
 
-    for (let  i  =  1;  i  <=  totalPages;  i++) {
-        const  btn  = document.createElement("button");
-        btn.textContent  =  i;
-       btn.className  =  (i  === currentPage)  ?  "active"  :  "";
-       btn.addEventListener("click",  ()  =>  cargarCatalogo(i));
-       container.appendChild(btn);
-    }
-
-   if  (currentPage  <  totalPages)  {
-       const  next  =  document.createElement("button");
-       next.textContent  =  "→";
-       next.addEventListener("click",  ()  =>  cargarCatalogo(currentPage  +  1));
-       container.appendChild(next);
-    }
+       for (let i = 1; i <= totalPages; i++) {
+              const btn = document.createElement("button");
+              btn.textContent = i;
+              if (i === currentPage) {
+                  btn.className = "active"; 
+              } else {
+                  // Si no es la activa, usa las propiedades estándar de tus botones
+                  btn.className = "btn-sec"; 
+              }
+              
+              // CORRECCIÓN CRÍTICA: Cada botón ejecuta estrictamente su número de página 'i'
+              btn.onclick = () => {
+                  cargarCatalogo(i);
+              };
+              
+              nav.appendChild(btn);
+       }
 }
 
 
-document.getElementById("search-cat")?.addEventListener("input",  ()  => {
-       cargarCatalogo(1);  //  reinicia  en  página 1  al  buscar
+
+// ========================================================
+// ESCUCHADOR PARA LA "X" DE LIMPIEZA DEL BUSCADOR
+// ========================================================
+document.getElementById("search-cat")?.addEventListener("search", function(event) {
+    // Si el campo quedó vacío (porque presionaron la X)
+    if (this.value === "") {
+        currentPage = 1; // Restablecemos obligatoriamente a la página 1 por defecto
+        cargarCatalogo(1); // Volvemos a pintar el listado completo con su paginado original
+    }
 });
+
+//restablezca la página 1 al escribir
+document.getElementById("search-cat")?.addEventListener("input", () => {
+    currentPage = 1; 
+    cargarCatalogo(1);
+});
+
 
 
 // ---------- FORMATO MXN ----------
@@ -216,34 +231,127 @@ function parseAndImportCSV(text){
 }
 
 function exportCatalogCSV() {
-    const rows = [];
-    const headers = ["Código", "Artículo", "Precio", "Stock"];
-    rows.push(headers);
+    // 1. Obtener catálogos directo de la memoria local
+    const articulos = DB.getArticles() || [];
+    let historial = [];
+    try {
+        historial = JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+    } catch (e) {
+        historial = [];
+    }
 
-    document.querySelectorAll("#catBody tr").forEach(tr => {
-        const cols = tr.querySelectorAll("td");
+    const rows = [];
+    
+    // ========================================================
+    // CABECERAS DE LA TABLA MAESTRA UNIFICADA DE AUDITORÍA
+    // ========================================================
+    rows.push([
+        "Código SKU", 
+        "Artículo / Prenda", 
+        "Precio", 
+        "Stock Anterior", 
+        "Cantidad Movida", 
+        "Stock Resultante", 
+        "Fecha y Hora Movimiento", 
+        "Usuario Responsable", 
+        "Tipo de Operación", 
+        "Motivo / Comentarios Breves"
+    ]);
+
+    // ========================================================
+    // PASO 2: MAPEAR LOS DATOS BASADOS EN EL HISTORIAL (CRONOLÓGICO)
+    // ========================================================
+    // Primero exportamos los productos que sí han tenido movimientos auditados
+    historial.forEach(h => {
+        const fechaMov = h.fecha ? new Date(h.fecha).toLocaleString() : '—';
+        
+        // Traducimos el identificador técnico al formato ejecutivo comercial
+        let opOriginal = String(h.tipo_movimiento || '').trim().toLowerCase();
+        let operacionTexto = "🔧 Ajuste Manual"; 
+        if (opOriginal.includes('surtido'))   operacionTexto = "📈 Entrada - Surtido";
+        if (opOriginal.includes('traspaso') && opOriginal.includes('entrada')) operacionTexto = "🔄 Entrada - Traspaso";
+        if (opOriginal.includes('traspaso') && opOriginal.includes('salida'))  operacionTexto = "🔄 Salida - Traspaso";
+        if (opOriginal.includes('auditoria') || opOriginal.includes('conteo'))  operacionTexto = "🔧 Ajuste - Conteo Puro";
+        if (opOriginal.includes('merma') || opOriginal.includes('daño'))       operacionTexto = "📉 Salida - Merma/Daño";
+
+        const cantidad = typeof h.cantidad_capturada !== 'undefined' ? h.cantidad_capturada : (h.cantidad_movida || 0);
+        const stockAnt = typeof h.stock_anterior !== 'undefined' ? h.stock_anterior : 0;
+        
+        // Buscamos el nombre del artículo en el catálogo si es necesario
+        let nombreArt = h.nombre_article || h.nombre_articulo || h.articulo || '';
+        const skuBuscado = h.codigo_articulo || h.codigo || '';
+        if (!nombreArt && skuBuscado) {
+            const encontrado = articulos.find(a => String(a.codigo) === String(skuBuscado));
+            if (encontrado) nombreArt = encontrado.nombre;
+        }
+        if (!nombreArt) nombreArt = "Artículo no identificado";
+
+        const nombreArtLimpio = String(nombreArt).replace(/"/g, '""');
+        const motivoLimpio = String(h.motivo || h.reason || '—').replace(/"/g, '""');
+        const codigoLimpio = String(skuBuscado).replace(/"/g, '""');
+
+        // Insertamos la fila completa unificada
         rows.push([
-            cols[0].textContent.trim(),
-            cols[1].textContent.trim(),
-            parseFloat(cols[2].textContent.replace(/[^0-9.]/g, "")),
-            parseInt(cols[3].textContent.trim())
+            `"${codigoLimpio}"`,
+            `"${nombreArtLimpio}"`,
+            Number(h.precio || 0), // Si no tiene el precio guardado en el log, saldrá 0
+            Number(stockAnt),
+            Number(cantidad),
+            Number(h.stock_actualizado || 0),
+            `"${fechaMov}"`,
+            `"${h.usuario || '—'}"`,
+            `"${operacionTexto}"`,
+            `"${motivoLimpio}"`
         ]);
     });
 
+    // ========================================================
+    // PASO 3: INCLUIR PRODUCTOS SIN MOVIMIENTOS (CORREGIDO Y ALINEADO)
+    // ========================================================
+    articulos.forEach(a => {
+        const yaExportado = historial.some(h => String(h.codigo_articulo || h.codigo) === String(a.codigo));
+        
+        if (!yaExportado) {
+            const nombreLimpio = String(a.nombre || '').replace(/"/g, '""');
+            const codigoLimpio = String(a.codigo || '').replace(/"/g, '""');
+            const fechaUltima = a.ultimo_movimiento ? new Date(a.ultimo_movimiento).toLocaleString() : '—';
+            const usuarioUltimo = a.usuario_movimiento || '—';
+
+            rows.push([
+                `"${codigoLimpio}"`,                       // 1. Código SKU (Col A)
+                `"${nombreLimpio}"`,                       // 2. Artículo / Prenda (Col B)
+                Number(a.precio || 0),                     // 3. Precio (Col C)
+                Number(a.stock || 0),                      // 4. Stock Anterior (Col D)
+                0,                                         // 5. Cantidad Movida (Col E)
+                Number(a.stock || 0),                      // 6. Stock Resultante (Col F)
+                `"${fechaUltima}"`,                        // 7. Fecha y Hora Movimiento (Col G)
+                `"${usuarioUltimo}"`,                      // 8. Usuario Responsable (Col H)
+                "\"\"",                  // 9. Tipo de Operación (Col I)
+                "\"\"" // 10. Motivo (Col J)
+            ]);
+        }
+    });
+
+    // Convertir la matriz de una sola tabla a texto separado por comas
     const csvContent = rows.map(e => e.join(",")).join("\n");
 
-    // 🔹 BOM al inicio para que Excel reconozca UTF-8
+    // Cabecera BOM UTF-8 para Excel
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = "CatalogoArticulos.csv";
+    
+    const fechaHoy = new Date().toISOString().split('T');
+    link.download = `Inventario_Unificado_${fechaHoy}.csv`;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
+
+
 
 
 document.getElementById("btn-export-csv")?.addEventListener("click", exportCatalogCSV);
@@ -261,50 +369,52 @@ document.addEventListener("keydown", (event) => {
             // Cerrar modal
             modalStock.classList.add("hidden");
 	}
+
+        const modalHistoryStock = document.getElementById("modal-article-history");
+        if (modalHistoryStock && !modalHistoryStock.classList.contains("hidden")) {
+            // Cerrar modal
+            modalHistoryStock.classList.add("hidden");
+	}
     }
 });
 
-// Variable global única y blindada
+// Variable global para retener el código único del artículo seleccionado
 let currentStockArticleCode = null;
 
-function openStockModal(idArticulo) {
-    // 1. Extraer los datos reales directo de tu LocalStorage mediante tu objeto DB
-    const articulo = DB.getArticles().find(a => a.id === idArticulo);
-    if (!articulo) return alert("Artículo no encontrado.");
+function openStockModal(codigoArticulo) {
+    // 🔥 BUSQUEDA BLINDADA: Buscamos en la base de datos comparando por la propiedad .codigo
+    const articulo = DB.getArticles().find(a => String(a.codigo) === String(codigoArticulo));
+    if (!articulo) return alert("Error: No se encontró el artículo seleccionado.");
 
-    // 2. Anclar el ID único en la memoria global del script
-    currentStockArticleCode = idArticulo;
+    // Guardamos el código maestro en la variable global para el momento de guardar
+    currentStockArticleCode = codigoArticulo;
     
-    // 3. Procesar matemáticamente las existencias registradas (si es undefined, se vuelve 0)
     const stockReal = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
 
-    // 4. Inyectar de forma directa los textos descriptivos a la interfaz
+    // Inyectar datos reales directo del objeto de la base de datos a la modal
     document.getElementById('stock-modal-title').textContent = `Ajustar Stock: ${articulo.nombre}`;
     document.getElementById('stock-modal-sku').textContent = `Código/SKU: ${articulo.codigo}`;
     
-    // 5. BLINDAJE UX/UI: Localizar el input por cualquiera de sus variantes y FORZAR el número real
+    // Forzamos la inyección visual en el input de tu HTML
     const inputStock = document.getElementById('inventory-modal-stock') || document.getElementById('st-current');
     if (inputStock) {
-        inputStock.value = stockReal; // Aquí se sobrescribe y destruye cualquier 1000 fantasma
+        inputStock.value = stockReal;
     }
     
-    // 6. Blanquear rigurosamente los campos de entrada de datos para el nuevo movimiento
-    const inputsCaptura = ['inventory-modal-qty', 'st-qty', 'inventory-modal-reason', 'st-reason'];
-    inputsCaptura.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
+    // Limpieza de campos de captura para el nuevo movimiento
+    const inputQty = document.getElementById('inventory-modal-qty') || document.getElementById('st-qty');
+    if (inputQty) inputQty.value = '';
+
+    const inputReason = document.getElementById('inventory-modal-reason') || document.getElementById('st-reason');
+    if (inputReason) inputReason.value = '';
 
     const selectorTipo = document.getElementById('inventory-modal-type') || document.getElementById('st-type');
     if (selectorTipo) selectorTipo.selectedIndex = 0;
 
-    // 7. Desplegar el modal removiendo la propiedad de ocultación
-    const modal = document.getElementById('modal-stock-adjust');
-    if (modal) modal.classList.remove('hidden');
+    document.getElementById('modal-stock-adjust').classList.remove('hidden');
 }
 
 function guardarAjusteInventario() {
-    // 1. Capturar cantidades de forma flexible evaluando ambas nomenclaturas de ID
     const inputQty = document.getElementById('inventory-modal-qty') || document.getElementById('st-qty');
     const inputType = document.getElementById('inventory-modal-type') || document.getElementById('st-type');
     const inputReason = document.getElementById('inventory-modal-reason') || document.getElementById('st-reason');
@@ -313,48 +423,70 @@ function guardarAjusteInventario() {
     const typeIn = inputType ? inputType.value : "entrada_surtido";
     const reasonIn = inputReason ? inputReason.value.trim() : "";
 
-    // 2. Ir directo a la DB usando la variable global segura (Evitamos leer el st-current del HTML)
     const listaArticulos = DB.getArticles();
-    const articulo = listaArticulos.find(a => a.id === currentStockArticleCode);
-    if (!articulo) return alert("Error interno: No se pudo identificar el artículo seleccionado.");
+    const articulo = listaArticulos.find(a => String(a.codigo) === String(currentStockArticleCode));
+    if (!articulo) return alert("Error interno: No se pudo identificar el artículo.");
 
-    // 3. Tomar el stock original directo de la base de datos local en memoria
     const currentStock = typeof articulo.stock !== 'undefined' ? Number(articulo.stock) : 0;
 
-    // 4. Validaciones obligatorias de negocio
-    if (!qtyIn || qtyIn <= 0 || isNaN(qtyIn)) {
-        return alert("Por favor, ingresa una cantidad válida mayor a cero.");
-    }
-    if (!reasonIn) {
-        return alert("Por favor, describe detalladamente el motivo del movimiento.");
-    }
+    // Validaciones estrictas de control
+    if (isNaN(qtyIn) || qtyIn < 0) return alert("Por favor, ingresa una cantidad numérica válida igual o mayor a cero.");
+    if (!reasonIn) return alert("Por favor, describe detalladamente el motivo del movimiento.");
 
-    // 5. Calcular aritméticamente si la operación suma o resta
-    const esSalida = typeIn.includes('salida');
-    let nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
+    let nuevoStock = currentStock;
+
+    // 🔥 REGLA DE NEGOCIO SELECCIONADA POR EL USUARIO:
+    if (typeIn === 'ajuste_auditoria') {
+        // En auditoría, el valor capturado reemplaza directamente al stock actual per se
+        nuevoStock = qtyIn;
+    } else {
+        // Para el resto de las opciones, opera con sumas y restas tradicionales
+        const esSalida = typeIn.includes('salida');
+        nuevoStock = esSalida ? (currentStock - qtyIn) : (currentStock + qtyIn);
+    }
 
     if (nuevoStock < 0) {
-        return alert(`Operación cancelada: El ajuste dejaría el stock en negativo (${nuevoStock}). No hay unidades suficientes.`);
+        return alert(`Operación cancelada: El ajuste dejaría el stock en negativo (${nuevoStock}).`);
     }
 
-    // 6. ACTUALIZAR EL CATÁLOGO EN TU LOCALSTORAGE
+    const timestampActual = new Date().toISOString();
+    
+    // Obtener contexto seguro del empleado activo
+    const sessionData = sessionStorage.getItem('pos_user') || sessionStorage.getItem('pos_cashier');
+    let nombreUsuarioLogueado = "Administrador";
+    if (sessionData) {
+        try {
+            const parsed = JSON.parse(sessionData);
+            nombreUsuarioLogueado = parsed.user || parsed.usuario || nombreUsuarioLogueado;
+        } catch(e) {
+            nombreUsuarioLogueado = sessionData;
+        }
+    }
+
+    // ACTUALIZAR EL ARTÍCULO EN LA BASE DE DATOS MAESTRA
     const articulosActualizados = listaArticulos.map(art => {
-        if (art.id === currentStockArticleCode) { 
-            return { ...art, stock: nuevoStock };
+        if (String(art.codigo) === String(currentStockArticleCode)) { 
+            return { 
+                ...art, 
+                stock: nuevoStock,
+                ultimo_movimiento: timestampActual, // Guarda fecha y hora
+                usuario_movimiento: nombreUsuarioLogueado // Guarda usuario
+            };
         }
         return art;
     });
     DB.saveArticles(articulosActualizados);
 
-    // 7. REGISTRAR EL MOVIMIENTO EN EL HISTORIAL (KARDEX)
+    // REGISTRAR EN EL HISTORIAL CRONOLÓGICO (KARDEX COMPLETO)
     const historialLog = DB.getInventoryLog();
     const nuevoRegistroLog = {
         id: Date.now().toString(),
-        fecha: new Date().toISOString(),
-        usuario: currentUser?.user || 'Administrador',
-        id_articulo: currentStockArticleCode,
+        fecha: timestampActual,
+        usuario: nombreUsuarioLogueado,
+        codigo_articulo: currentStockArticleCode,
+        nombre_articulo: articulo.nombre,
         tipo_movimiento: typeIn,
-        cantidad_movida: qtyIn,
+        cantidad_capturada: qtyIn,
         stock_anterior: currentStock,
         stock_actualizado: nuevoStock,
         motivo: reasonIn
@@ -363,17 +495,182 @@ function guardarAjusteInventario() {
     historialLog.unshift(nuevoRegistroLog);
     DB.saveInventoryLog(historialLog);
 
-    alert(`¡Movimiento aplicado con éxito!\nNuevo stock: ${nuevoStock} unidades.`);
+    alert(`¡Movimiento de inventario aplicado con éxito!\nNuevo stock: ${nuevoStock} unidades.`);
     
-    // 8. Ocultar modal y refrescar la tabla dinámica con paginación
     cerrarModalStock();
-    cargarCatalogo(); 
+    cargarCatalogo(currentPage); 
 }
-
 
 
 function cerrarModalStock() {
     document.getElementById('modal-stock-adjust').classList.add('hidden');
     currentStockArticleCode = null;
 }
+
+// Función para desplegar la bitácora completa de un artículo específico en pantalla
+function verHistorialArticulo(codigoArticulo) {
+    const articulos = DB.getArticles() || [];
+    const articulo = articulos.find(a => String(a.codigo) === String(codigoArticulo));
+    if (!articulo) return alert("Artículo no encontrado.");
+
+    // 1. Recuperar el log completo del LocalStorage
+    let historial = [];
+    try {
+        historial = JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+    } catch (e) {
+        historial = [];
+    }
+
+    // 2. Filtrar el historial dejando únicamente los movimientos de este artículo
+    const movimientosArticulo = historial.filter(h => String(h.codigo_articulo || h.codigo) === String(codigoArticulo));
+
+    // 3. Rellenar etiquetas de cabecera de la modal
+    document.getElementById('history-modal-title').textContent = `Historial de Cambios: ${articulo.nombre}`;
+    document.getElementById('history-modal-sku').textContent = `Código SKU: ${articulo.codigo} | Stock Actual: ${articulo.stock || 0}`;
+
+    const tbody = document.getElementById('history-rows-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    // 4. Si nunca ha tenido movimientos, mostrar renglón vacío informativo
+    if (movimientosArticulo.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 15px; color: #888;">Este artículo no registra modificaciones manuales de stock en esta terminal.</td></tr>`;
+    } else {
+        // 5. Inyectar cronológicamente cada fecha en la que se movió el stock
+        movimientosArticulo.forEach(m => {
+            const tr = document.createElement('tr');
+            const fecha = m.fecha ? new Date(m.fecha).toLocaleString() : '—';
+            
+            let opTexto = m.tipo_movimiento || '—';
+            if (opTexto.includes('surtido'))   opTexto = "📈 Surtido";
+            if (opTexto.includes('entrada_traspaso')) opTexto = "🔄 En. Traspaso";
+            if (opTexto.includes('salida_traspaso'))  opTexto = "🔄 Sal. Traspaso";
+            if (opTexto.includes('auditoria') || opTexto.includes('conteo'))  opTexto = "🔧 Auditoría";
+            if (opTexto.includes('merma'))     opTexto = "📉 Merma";
+
+            const cant = typeof m.cantidad_capturada !== 'undefined' ? m.cantidad_capturada : (m.cantidad_movida || 0);
+
+            tr.innerHTML = `
+                <td style="padding: 8px; font-size: 12px; color: #555;">${fecha}</td>
+                <td style="padding: 8px; font-weight: 600;">${m.usuario || '—'}</td>
+                <td style="padding: 8px;"><span style="font-size: 11px;">${opTexto}</span></td>
+                <td style="padding: 8px; text-align: center;">${cant}</td>
+                <td style="padding: 8px; text-align: center; font-weight: bold;">${m.stock_actualizado || m.stock_nuevo || 0}</td>
+                <td style="padding: 8px; font-style: italic; font-size: 12px; color: #666;">"${m.motivo || '—'}"</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 6. Mostrar la modal en el panel de MeetFashion
+    document.getElementById('modal-article-history')?.classList.remove('hidden');
+}
+
+function cerrarModalHistorial() {
+    document.getElementById('modal-article-history')?.classList.add('hidden');
+}
+
+
+
+// ========================================================
+// EXPORTAR EXCLUSIVAMENTE LA BITÁCORA HISTÓRICA (KARDEX)
+// ========================================================
+function exportInventoryLogCSV() {
+    const articulos = DB.getArticles() || [];
+    
+    // 1. Obtener la bitácora desde la memoria del LocalStorage de forma segura
+    let historial = [];
+    try {
+        historial = JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+    } catch (e) {
+        historial = [];
+    }
+
+    const rows = [];
+
+    // 2. Definir los encabezados oficiales de auditoría
+    rows.push([
+        "Fecha y Hora", 
+        "Usuario Responsable", 
+        "Código SKU", 
+        "Artículo / Prenda", 
+        "Tipo de Operación", 
+        "Cantidad Movida", 
+        "Stock Anterior", 
+        "Stock Resultante", 
+        "Motivo / Comentarios de Auditoría"
+    ]);
+
+    // 3. Si la bitácora está completamente vacía, insertar renglón preventivo
+    if (!historial || historial.length === 0) {
+        rows.push([
+            "—", "—", "—", "—", 
+            "Sin movimientos registrados en el sistema", 
+            0, 0, 0, 
+            "No se registran ajustes manuales de inventario en esta terminal todavía."
+        ]);
+    } else {
+        // 4. Mapear cada celda del Kardex asegurando el filtrado de comas para Excel
+        historial.forEach(h => {
+            const fechaMov = h.fecha ? new Date(h.fecha).toLocaleString() : '—';
+            
+            // Traducir identificadores técnicos a formato comercial legible
+            let opOriginal = String(h.tipo_movimiento || '').trim().toLowerCase();
+            let operacionTexto = "🔧 Ajuste Manual"; 
+            if (opOriginal.includes('surtido'))   operacionTexto = "📈 Entrada - Surtido de Mercancía";
+            if (opOriginal.includes('traspaso') && opOriginal.includes('entrada')) operacionTexto = "🔄 Entrada - Traspaso de Tienda";
+            if (opOriginal.includes('traspaso') && opOriginal.includes('salida'))  operacionTexto = "🔄 Salida - Traspaso de Tienda";
+            if (opOriginal.includes('auditoria') || opOriginal.includes('conteo'))  operacionTexto = "🔧 Ajuste - Conteo Puro por Conteo";
+            if (opOriginal.includes('merma') || opOriginal.includes('daño'))       operacionTexto = "📉 Salida - Prenda Dañada / Merma";
+
+            const cantidad = typeof h.cantidad_capturada !== 'undefined' ? h.cantidad_capturada : (h.cantidad_movida || 0);
+            const stockAnt = typeof h.stock_anterior !== 'undefined' ? h.stock_anterior : 0;
+            const stockNvo = typeof h.stock_actualizado !== 'undefined' ? h.stock_actualizado : 0;
+            
+            // Recuperar dinámicamente el nombre del artículo si faltaba en el log
+            let nombreArt = h.nombre_article || h.nombre_articulo || h.articulo || '';
+            const skuBuscado = h.codigo_articulo || h.codigo || '';
+            if (!nombreArt && skuBuscado) {
+                const encontrado = articulos.find(a => String(a.codigo) === String(skuBuscado));
+                if (encontrado) nombreArt = encontrado.nombre;
+            }
+            if (!nombreArt) nombreArt = "Artículo no identificado";
+
+            // Limpieza estricta de textos para que las comillas dobles internas no corrompan las celdas
+            const nombreArtLimpio = String(nombreArt).replace(/"/g, '""');
+            const motivoLimpio = String(h.motivo || h.reason || '—').replace(/"/g, '""');
+            const codigoLimpio = String(skuBuscado).replace(/"/g, '""');
+
+            rows.push([
+                `"${fechaMov}"`,
+                `"${h.usuario || '—'}"`,
+                `"${codigoLimpio}"`,
+                `"${nombreArtLimpio}"`,
+                `"${operacionTexto}"`,
+                Number(cantidad),
+                Number(stockAnt),
+                Number(stockNvo),
+                `"${motivoLimpio}"`
+            ]);
+        });
+    }
+
+    // 5. Compilar la matriz y forzar la descarga con cabecera BOM UTF-8
+    const csvContent = rows.map(e => e.join(",")).join("\n");
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    
+    // Nombrar el archivo automáticamente con la fecha y hora de la auditoría actual
+    const timestampArchivo = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = `Bitacora_Kardex_Stock_${timestampArchivo}.csv`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 
