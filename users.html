@@ -11,8 +11,6 @@
 .user-row{ display:flex; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #f0f0f0; align-items:center; }
 .small-btn{ padding:6px 8px; font-size:13px; }
 </style>
-<!--  Carga  la  API de  Maps  -->
-<script async  defer  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCGhzLaLLZCucTYPomCuzUTSlo6gdjVwbQ&libraries=places&callback=initAutocomplete"></script>
 <script>
 function  initAutocomplete()  {
    const  input  = document.getElementById('u-address');
@@ -50,8 +48,9 @@ function  initAutocomplete()  {
        <tr>
 	   <th>Usuario</th>
 	   <th>Nombre</th>
-	   <th>Correo</th>
 	   <th>Turno</th>
+	   <th>Estación</th>
+	   <th>Correo</th>
 	   <th>Modificado</th>
 	   <th>Acciones</th>
        </tr>
@@ -64,9 +63,10 @@ function  initAutocomplete()  {
 <div  id="modal-user"  class="modal  hidden">
    <div  class="modal-content">
       <h3  id="modal-title">Nuevo  usuario</h3>
+      
        <div class="form-row">
            <input id="u-user"  placeholder="Usuario  (login)">
-          <input  id="u-name"  placeholder="Nombre completo">
+           <input  id="u-name"  placeholder="Nombre completo">
            <!-- Campo de contraseña con el ojo integrado -->
            <div class="password-wrapper" style="position: relative; display: flex; align-items: center; flex: 1;">
                <input id="u-pass" placeholder="Contraseña" type="password" style="padding-right: 40px; width: 100%;">
@@ -75,23 +75,36 @@ function  initAutocomplete()  {
                </button>
            </div>
        </div>
+       
       <div  class="form-row">
-          <input  id="u-phone"  placeholder="Teléfono"  maxlength="10">
+          <input  id="u-phone"  placeholder="Teléfono"  maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
           <input  id="u-mail"  placeholder="Email">
-	  <gmpx-place-autocomplete  style="width:100%">
-	     <input  id="u-address" placeholder="Dirección"  />
-	  </gmpx-place-autocomplete>
-       </div>
+      </div> <!-- ✅ CORREGIDO: Cierre correcto de la fila de teléfono y correo -->
+
+	  <!-- SECCIÓN DE DIRECCIÓN INDEPENDIENTE Y FLOTANTE -->
+	  <div class="form-row" style="position: relative; width: 100%; display: block; margin-bottom: 15px;">
+	      <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Dirección</label>
+	      <input id="u-address" placeholder="Escribe calle, número, colonia..." class="form-control" autocomplete="off" style="width: 100%;">
+	    
+	      <!-- Contenedor flotante para las sugerencias de OpenStreetMap -->
+	      <div id="autocomplete-results" style="position: absolute; left: 0; right: 0; background: #fff; border: 1px solid #ccc; border-top: none; z-index: 9999; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 0 0 4px 4px;" class="hidden">
+	          <!-- Se llenará dinámicamente con JS -->
+	      </div>
+	  </div> <!-- ✅ CORREGIDO: Cierre correcto de la sección de dirección -->
+
        <div  class="form-row">
           <select  id="u-role"><option value="vendedor">Vendedor</option><option  value="admin">Administrador</option></select>
           <select  id="u-shift"><option  value="matutino">Matutino</option><option  value="vespertino">Vespertino</option></select>
+          <select  id="u-station"></select>
       </div>
+      
        <div  class="form-row">
           <button  class="btn"  onclick="saveUser()">Guardar</button>
           <button  class="btn alt"  onclick="cerrarModal()">Cancelar</button>
        </div>
    </div>
 </div>
+
 
 <script  src="auth.js"></script>
 <script>requireRole('admin');</script>
@@ -105,25 +118,55 @@ function  initAutocomplete()  {
 let editId = null;
 
 function saveUser(){
-    const user  =  document.getElementById('u-user').value.trim();
-   if  (!user)  return alert('Usuario  requerido');
+   const user = document.getElementById('u-user').value.trim();
+   const stationIn = document.getElementById("u-station").value; // Leemos la estación seleccionada
+   
+   if (!user) return alert('Usuario requerido');
 
-   const  obj  = {
+   // 1. Construcción del objeto de datos centralizado
+   const obj = {
        user,
        name:  document.getElementById('u-name').value.trim(),
-      pass:  document.getElementById('u-pass').value,
-       phone:  document.getElementById('u-phone').value,
-      mail:  document.getElementById('u-mail').value,
-       address:  document.getElementById('u-address').value,
-      role:  document.getElementById('u-role').value,
-       shift:  document.getElementById('u-shift').value,
-      modified:  new  Date().toISOString()
+       pass:  document.getElementById('u-pass').value,
+       phone: document.getElementById('u-phone').value.trim(),
+       mail:  document.getElementById('u-mail').value.trim(),
+       address: document.getElementById('u-address').value.trim(),
+       role:  document.getElementById('u-role').value,
+       shift: document.getElementById('u-shift').value,
+       modified: new Date().toISOString(),
+       estacion: stationIn
    };
 
+    // 2. CORRECCIÓN DEL CANDADO: Validamos leyendo las propiedades de 'obj'
+    if (!obj.user || !obj.name || !obj.pass || !obj.phone || !obj.mail || !obj.address || !obj.role || !obj.shift || !obj.estacion) {
+        alert("❌ Todos los campos son obligatorios.\nPor favor, ingresa los datos de acceso, información de contacto, dirección y asigna una estación de trabajo.");
+        return; // Retorna e interrumpe el guardado
+    }
+
+    // 3. CORRECCIÓN DE VALIDACIÓN DE TELÉFONO: Evaluamos el campo correcto de 'obj'
+    if (obj.phone.length < 10 || isNaN(obj.phone)) {
+        alert("❌ El campo de teléfono debe contener exactamente 10 dígitos numéricos.");
+        return;
+    }
+
+    // 4. CORRECCIÓN DE USUARIO DUPLICADO (Solo si es un usuario NUEVO)
+    let listaUsuarios = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem("usuarios")) || []);
+    
+    // Si la variable global de edición (ej. editId) está vacía, significa que es nuevo
+    if (typeof editId === 'undefined' || editId === null) {
+        const existeUsuario = listaUsuarios.some(u => (u.user || u.usuario || '').toLowerCase() === obj.user.toLowerCase());
+        if (existeUsuario) {
+            alert("❌ Este nombre de usuario (login) ya está registrado. Elige otro.");
+            return;
+        }
+    }
+
+   // 5. Guardar y refrescar interfaz
    DB.saveUser(obj);
    renderUsers();
    cerrarModal();
 }
+
 
 
 function editUser(u){
@@ -159,6 +202,10 @@ function abrirModalNuevo(){
   document.getElementById('u-role').value = 'vendedor';
   document.getElementById('u-shift').value = 'matutino';
   document.getElementById('u-user').readOnly = false;
+
+  // Llamamos la función sin parámetros para que muestre el mensaje "-- Selecciona Estación --"
+  poblarSelectorEstaciones(""); 
+
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -176,6 +223,10 @@ function abrirModalEditar(u){
   document.getElementById('u-address').value = obj.address || '';
   document.getElementById('u-role').value = obj.role || 'vendedor';
   document.getElementById('u-shift').value = obj.shift || 'matutino';
+
+  const estacionActual = obj.estacion || "";
+  poblarSelectorEstaciones(estacionActual);
+
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -203,8 +254,9 @@ function  renderUsers(){
       tr.innerHTML  =  `
          <td><strong>${u.user}</strong></td>
           <td>${u.name  || ''}</td>
-          <td>${u.mail  || ''}</td>
           <td>${u.shift  || ''}</td>
+          <td>${u.estacion  || ''}</td>
+          <td>${u.mail  || ''}</td>
           <td>${u.modified  ? new  Date(u.modified).toLocaleString()  : '-'}</td>
           <td>
              <button  class="small-btn" onclick="abrirModalEditar('${u.user}')">Editar</button>
@@ -228,6 +280,118 @@ document.addEventListener('click', function(event) {
             passwordInput.type = 'password';
             button.textContent = '👁️'; // Regresa al icono original
         }
+    }
+});
+
+
+function poblarSelectorEstaciones(estacionSeleccionada = "") {
+    const selectStation = document.getElementById("u-station");
+    if (!selectStation) return;
+
+    // 1. Leer las estaciones reales de tu catálogo centralizado
+    const estaciones = DB.getStations();
+
+    // 2. Limpiar opciones anteriores del HTML
+    selectStation.innerHTML = "";
+
+    // 3. Añadir una opción por defecto/inicial por si el usuario no tiene estación asignada aún
+    const optDefault = document.createElement("option");
+    optDefault.value = "";
+    optDefault.textContent = "-- Selecciona Estación (Opcional) --";
+    selectStation.appendChild(optDefault);
+
+    // 4. Inyectar las estaciones reales del LocalStorage
+    estaciones.forEach(est => {
+        const option = document.createElement("option");
+        option.value = est.nombre; // Guardamos el nombre como identificador
+        option.textContent = est.nombre; // Texto visible en el menú
+        
+        // Si estamos editando y coincide con la estación actual del usuario, la dejamos marcada
+        if (est.nombre === estacionSeleccionada) {
+            option.selected = true;
+        }
+        
+        selectStation.appendChild(option);
+    });
+}
+
+
+// ========================================================
+// AUTOCOMPLETADO DE DIRECCIONES GRATUITO CON OPENSTREETMAP
+// ========================================================
+let debounceTimer;
+
+document.getElementById('u-address')?.addEventListener('input', function() {
+    const query = this.value.trim();
+    const resultsContainer = document.getElementById('autocomplete-results');
+    
+    if (!resultsContainer) return;
+    
+    // Si borra el texto, ocultamos la caja de sugerencias
+    if (query.length < 3) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.classList.add('hidden');
+        return;
+    }
+
+    // Cancelamos el temporizador anterior si sigue escribiendo rápido
+    clearTimeout(debounceTimer);
+
+    // Esperamos 400ms tras la última pulsación de tecla para no saturar la red
+    debounceTimer = setTimeout(() => {
+        // Consultamos la API pública y gratuita de 
+
+        // Agregamos 'countrycodes=mx' para restringir la búsqueda a México y sea más rápido
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=mx&q=${encodeURIComponent(query)}`, {
+            headers: {
+                'User-Agent': 'MeetFashion-POS-Local-v1.0'
+            }
+        })
+        .then(response => response.json())
+
+            .then(data => {
+                resultsContainer.innerHTML = '';
+                
+                if (data.length === 0) {
+                    resultsContainer.classList.add('hidden');
+                    return;
+                }
+
+                resultsContainer.classList.remove('hidden');
+
+                // Renderizar cada opción devuelta por OpenStreetMap
+                data.forEach(place => {
+                    const item = document.createElement('div');
+                    item.style.padding = '10px';
+                    item.style.cursor = 'pointer';
+                    item.style.borderBottom = '1px solid #f0f0f0';
+                    item.style.fontSize = '13px';
+                    item.style.color = '#333';
+                    item.textContent = place.display_name;
+
+                    // Efecto visual al pasar el mouse por encima
+                    item.onmouseover = () => item.style.background = '#f8f9fa';
+                    item.onmouseout = () => item.style.background = '#fff';
+
+                    // Acción al seleccionar la dirección de la lista
+                    item.addEventListener('click', () => {
+                        document.getElementById('u-address').value = place.display_name;
+                        resultsContainer.innerHTML = '';
+                        resultsContainer.classList.add('hidden');
+                    });
+
+                    resultsContainer.appendChild(item);
+                });
+            })
+            .catch(err => console.error("Error en autocompletado:", err));
+    }, 400);
+});
+
+// Cerrar el menú flotante si el usuario hace clic en cualquier otra parte de la pantalla
+document.addEventListener('click', (e) => {
+    const container = document.getElementById('autocomplete-results');
+    if (container && e.target.id !== 'u-address') {
+        container.classList.add('hidden');
     }
 });
 
