@@ -35,16 +35,49 @@ document.getElementById("buscar").onclick = () => {
 
     if (!desde || !hasta) return alert("Selecciona fechas");
 
-    const ventas = DB.getSalesByDate(desde, hasta);
+    // Convertimos los límites de los inputs HTML a objetos de fecha puros (a medianoche)
+    const fechaDesdeObj = new Date(desde + "T00:00:00");
+    const fechaHastaObj = new Date(hasta + "T23:59:59");
+
+    // Traer todos los registros
+    const todasLasVentas = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem("ventas")) || []);
+
+    // FILTRADO ROBUSTO POR OBJETO DE FECHA
+    const ventas = todasLasVentas.filter(v => {
+        if (!v.fecha) return false;
+        
+        let fechaVentaObj;
+
+        // Si la fecha guardada es un formato regional de texto (como "26/6/2026, 3:19 p.m.")
+        if (typeof v.fecha === 'string' && v.fecha.includes('/')) {
+            // Separamos la fecha de la hora, quitamos comas y dividimos por diagonales
+            const partesFecha = v.fecha.split(',')[0].trim().split('/');
+            if (partesFecha.length === 3) {
+                const dia = partesFecha[0];
+                const mes = partesFecha[1] - 1; // En JS los meses van de 0 a 11
+                const anio = partesFecha[2];
+                fechaVentaObj = new Date(anio, mes, dia);
+            }
+        } else {
+            // Si es un formato estándar ISO o timestamp numérico
+            fechaVentaObj = new Date(v.fecha);
+        }
+
+        // Si el objeto de fecha no se pudo crear bien, saltamos este registro
+        if (isNaN(fechaVentaObj.getTime())) return false;
+
+        // Comparamos el objeto de fecha directamente si se encuentra dentro del rango de días
+        return fechaVentaObj >= fechaDesdeObj && fechaVentaObj <= fechaHastaObj;
+    });
 
     let total = 0, tCash = 0, tCard = 0, tTransfer = 0;
 
+    // Procesar montos asegurando que se traten como números válidos
     ventas.forEach(v => {
-        total += v.total;
-        tCash += v.pagos?.efectivo || 0;
-        tCard += v.pagos?.tarjeta || 0;
-        tTransfer += v.pagos?.transferencia || 0;
-
+        total += Number(v.total || 0);
+        tCash += Number(v.pagos?.efectivo || 0);
+        tCard += Number(v.pagos?.tarjeta || 0);
+        tTransfer += v.pagos?.transferencia ? Number(v.pagos.transferencia) : 0;
     });
 
     document.getElementById("r-total").textContent = `$${total.toFixed(2)}`;
@@ -52,12 +85,12 @@ document.getElementById("buscar").onclick = () => {
     document.getElementById("r-card").textContent = `$${tCard.toFixed(2)}`;
     document.getElementById("r-transfer").textContent = `$${tTransfer.toFixed(2)}`;
 
-    // Diferencia
+    // Recalcular Diferencia dinámicamente incluyendo el fondo de caja
     const contado = recalcContado();
-    const dif = contado - (tCash + Number(document.getElementById("fondo").value || 0));
+    const fondoCaja = Number(document.getElementById("fondo").value || 0);
+    const dif = contado - (tCash + fondoCaja);
     difSpan.textContent = `$${dif.toFixed(2)}`;
 };
-
 
 
 // Guardar corte
