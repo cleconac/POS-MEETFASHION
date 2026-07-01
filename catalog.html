@@ -14,8 +14,11 @@
            <button class="btn-sec" onclick="window.location='ventas.html'">← Volver al POS</button>
 	   <input id="file-csv" type="file" accept=".csv" />
            <button class="btn small" onclick="abrirNuevo()">+ Nuevo Artículo</button>
-   	   <button id="btn-import-csv" class="btn small">Importar CSV</button>
-	   <button id="btn-export-csv" class="btn small">Exportar CSV</button>
+   	   <button id="btn-import-csv" class="btn small">Importar Catálogo</button>
+	   <button id="btn-export-csv" class="btn small">Exportar Catálogo</button>
+	   <button class="btn small" onclick="exportInventoryLogCSV()" style="background-color: #28a745;">
+	       📊 Exportar Historial de Stock
+	   </button>
        </div>
     </div>
 
@@ -23,7 +26,7 @@
 
 
 <div class="container">
- <input  id="search-cat"  type="text"  placeholder="Buscar artículo..."  />
+ <input  id="search-cat"  type="search"  placeholder="Buscar artículo..."  />
 
     <table class="cat-table">
         <thead>
@@ -32,6 +35,8 @@
                 <th>Artículo</th>
                 <th>Precio</th>
                 <th>Stock</th>
+                <th>Modificado</th>
+                <th>Por (Usuario)</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -65,40 +70,41 @@
     </div>
 </div>
 
-<!-- Modal Exclusiva para Ajuste de Inventario -->
+<!-- MODAL DE INVENTARIO EN TU CATALOG.HTML -->
 <div id="modal-stock-adjust" class="modal hidden">
    <div class="modal-content" style="max-width: 450px;">
       <h3 id="stock-modal-title">Movimiento de Inventario</h3>
       <p id="stock-modal-sku" style="font-weight: bold; color: #555;"></p>
       
-
-<div class="form-row" style="display: flex; gap: 10px; margin-bottom: 15px;">
-    <div style="flex: 1;">
-        <label>Stock Actual</label>
-        <!-- Forzamos el ID st-current, valor inicial en 0 y modo lectura -->
-        <input id="st-current" type="number" readonly value="0" style="background: #eee; width: 100%; color: #333; font-weight: bold;">
-    </div>
-    <div style="flex: 1;">
-        <label>Cantidad a Mover *</label>
-        <input id="st-qty" type="number" min="1" placeholder="Ej: 5, 10" style="width: 100%;">
-    </div>
-</div>
-
+      <div class="form-row" style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <div style="flex: 1;">
+              <label>Stock Actual</label>
+              <!-- 🔥 CAMBIO: Usamos 'inventory-modal-stock' como ID único y quitamos cualquier valor fijo -->
+              <input id="inventory-modal-stock" type="number" readonly style="background: #eee; width: 100%; font-weight: bold; color: #333;">
+          </div>
+          <div style="flex: 1;">
+              <label>Cantidad a Mover *</label>
+              <!-- 🔥 CAMBIO: Usamos 'inventory-modal-qty' como ID único -->
+              <input id="inventory-modal-qty" type="number" min="1" placeholder="Ej: 5" style="width: 100%;">
+          </div>
+      </div>
 
       <div class="form-row" style="margin-bottom: 15px;">
           <label>Tipo de Operación *</label>
-          <select id="st-type" style="width: 100%;">
+          <!-- 🔥 CAMBIO: Usamos 'inventory-modal-type' como ID único -->
+          <select id="inventory-modal-type" style="width: 100%;">
               <option value="entrada_surtido">📈 Entrada - Surtido de Mercancía</option>
               <option value="entrada_traspaso">🔄 Entrada - Traspaso de Tienda</option>
               <option value="salida_traspaso">🔄 Salida - Traspaso de Tienda</option>
               <option value="ajuste_auditoria">🔧 Ajuste - Conteo / Auditoría</option>
-              <option value="salida_merma">📉 Salida - Artículo Dañado / Merma</option>
+              <option value="salida_merma">📉 Salida - Prenda Dañada / Merma</option>
           </select>
       </div>
 
       <div class="form-row" style="margin-bottom: 15px;">
           <label>Motivo / Comentarios Breves *</label>
-          <input id="st-reason" placeholder="Ej: Recibido de sucursal centro..." style="width: 100%;">
+          <!-- 🔥 CAMBIO: Usamos 'inventory-modal-reason' como ID único -->
+          <input id="inventory-modal-reason" placeholder="Ej: Mercancía recibida..." style="width: 100%;">
       </div>
 
       <div class="form-row" style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -107,6 +113,38 @@
       </div>
    </div>
 </div>
+
+<!-- MODAL DE HISTORIAL CRONOLÓGICO (KARDEX VISUAL) -->
+<div id="modal-article-history" class="modal hidden">
+   <div class="modal-content" style="max-width: 650px; width: 90%;">
+      <h3 id="history-modal-title">Historial de Movimientos</h3>
+      <p id="history-modal-sku" style="font-weight: bold; color: #555; margin-bottom: 15px;"></p>
+      
+      <!-- Contenedor con scroll por si tiene muchos cambios en la semana -->
+      <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px;">
+          <table class="cat-table" style="margin-top: 0; box-shadow: none; font-size: 13px;">
+              <thead style="background: #f1f5f9;">
+                  <tr>
+                      <th style="padding: 8px;">Fecha / Hora</th>
+                      <th style="padding: 8px;">Usuario</th>
+                      <th style="padding: 8px;">Operación</th>
+                      <th style="padding: 8px;">Cantidad</th>
+                      <th style="padding: 8px;">Stock Final</th>
+                      <th style="padding: 8px;">Motivo / Comentarios</th>
+                  </tr>
+              </thead>
+              <tbody id="history-rows-body">
+                  <!-- Se llena dinámicamente con JS -->
+              </tbody>
+          </table>
+      </div>
+
+      <div class="modal-buttons" style="margin-top: 20px;">
+          <button class="btn-primary" onclick="cerrarModalHistorial()">Entendido / Cerrar</button>
+      </div>
+   </div>
+</div>
+
 
 <script  src="auth.js"></script>
 <script>requireRole('admin');</script>
