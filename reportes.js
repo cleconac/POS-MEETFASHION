@@ -12,6 +12,67 @@ const  exportarBtn  =  document.getElementById("btn-exportar");
 let  datosFiltrados  =  [];  // ←  guarda  el  resultado  para  exportar
 
 
+// 1. Obtención segura del usuario activo en la terminal
+const activeReportUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
+
+// 2. FUNCIÓN DE CANDADOS DE AUDITORÍA PARA LA SECCIÓN DE REPORTES
+function aplicarCandadosSeccionReportes() {
+    if (!activeReportUserSession) return;
+
+    const rolLogueado = (activeReportUserSession.role || activeReportUserSession.rol || '').toLowerCase();
+    const aliasLogueado = (activeReportUserSession.user || activeReportUserSession.usuario || '').toLowerCase();
+    
+    // 👑 INMUNIDAD MASTER: El dueño general hereda acceso automático total por diseño
+    const esMaestro = rolLogueado === 'master' || aliasLogueado === 'sup' || aliasLogueado === 'admin';
+
+    // Recuperamos las variables booleanas de tu LocalStorage
+    const p = esMaestro ? { ventas: true, cortes: true, exportar: true } : (activeReportUserSession.permisos?.reportes || {});
+
+    // Localizamos tus elementos utilizando tus IDs reales compartidos
+    const optVentas    = document.getElementById('opt-perm-ventas');
+    const optCortes    = document.getElementById('opt-perm-cortes');
+    const btnExportar  = document.getElementById('btn-exportar');
+    const selectReport = document.getElementById('tipo-reporte');
+
+    // --- CANDADO 1: PERMISO PARA VER VENTAS ---
+    if (optVentas && !esMaestro && !p.ventas) {
+        optVentas.remove(); // Removemos la opción para que el empleado no la pueda seleccionar
+    }
+
+    // --- CANDADO 2: PERMISO PARA VER CORTES ---
+    if (optCortes && !esMaestro && !p.cortes) {
+        optCortes.remove(); // Removemos la opción para blindar la caja
+    }
+
+    // PROTECCIÓN DE INTERFAZ VACÍA:
+    // Si a un administrador limitado le bloquearon tanto Ventas como Cortes, el select se quedaría en blanco.
+    // Le inyectamos una opción deshabilitada de aviso administrativo por seguridad.
+    if (selectReport && selectReport.options.length === 0) {
+        const optVacio = document.createElement("option");
+        optVacio.textContent = "Módulo Restringido";
+        optVacio.disabled = true;
+        optVacio.selected = true;
+        selectReport.appendChild(optVacio);
+        
+        // Deshabilitamos el botón de buscar nativo para que no intente procesar consultas vacías
+        const btnBuscar = document.getElementById('btn-buscar');
+        if (btnBuscar) btnBuscar.disabled = true;
+    }
+
+    // --- CANDADO 3: PERMISO PARA EXPORTAR CSV ---
+    if (btnExportar) {
+        // Si no tiene la casilla marcada en el árbol, el botón "Exportar CSV" desaparece por completo
+        btnExportar.style.display = (esMaestro || p.exportar) ? '' : 'none';
+    }
+}
+
+// 3. ENLAZAR ARRANQUE AUTOMÁTICO EN EL DOM
+document.addEventListener("DOMContentLoaded", () => {
+    // El sistema primero valida el acceso general (auth.js) y luego recorta las opciones de este módulo
+    aplicarCandadosSeccionReportes();
+});
+
+
 buscarBtn.addEventListener("click", buscarPorFechas);
 
 
@@ -69,6 +130,9 @@ function  buscarPorFechas()  {
 }
 
 
+/* ========================================================
+   RENDER PARA LA BUSQUEDA DE VENTAS
+   ======================================================== */
  function  renderVentas(arr,  destino) {
      destino.innerHTML =  "";
  
@@ -104,6 +168,9 @@ function  buscarPorFechas()  {
     destino.innerHTML  =  html;}
 
 
+/* ========================================================
+   RENDER PARA LA BUSQUEDA DE CORTES
+   ======================================================== */
  function  renderCortes(arr,  destino)  {
     destino.innerHTML  =  "";
 
@@ -145,7 +212,7 @@ function  buscarPorFechas()  {
            :  `<div  style="color:#666">Sin  artículos en  este  corte</div>`;
  
         html  += `
-            <tr  class="corte-row"  tabindex="0" onclick="mostrarDetalle(${JSON.stringify(c).replace(/"/g,  '&quot;')})">
+            <tr  class="corte-row"  tabindex="0" onclick="mostrarDetalle(${JSON.stringify(c).replace(/"/g,  '&quot;')}, this)">
                <td>${fechaMX}</td>
                 <td>${horaMX}</td>
                <td>${c.usuario  || "—"}</td>
@@ -171,7 +238,129 @@ function  buscarPorFechas()  {
     if  (firstRow)  firstRow.focus();
  }
 
+/* ========================================================
+   RENDER PARA LA BUSQUEDA DE TICKETS VENDIDOS
+   ======================================================== */
+function renderTickets(arr, destino) {
+    destino.innerHTML = "";
 
+    if (!arr || arr.length === 0) {
+        destino.innerHTML = `<div class="empty">No hay tickets emitidos en ese rango de fechas.</div>`;
+        return;
+    }
+
+    let html = `<table class="table">
+        <tr>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Folio / Ticket</th>
+            <th>Usuario</th>
+            <th>Estación</th>
+            <th>Método Pago</th>
+            <th>Total Vendido</th>
+        </tr>`;
+
+    arr.forEach((t, i) => {
+        // Aprovechamos tus mismas funciones de conversión de fecha
+        const [fechaMX, horaMX] = mxFechaHora ? mxFechaHora(t.fecha) : [t.fecha, '—'];
+        
+        // Mapeamos los artículos vendidos en este ticket específico para construir su desglose lateral/flotante
+        const articulos = t.articulos && typeof t.articulos === "object" 
+            ? Object.values(t.articulos) 
+            : (t.articulos || []);
+
+        const detalleHTML = articulos.length
+            ? `<ul style="margin:0;padding-left:20px;">
+                  ${articulos.map(a => {
+                      const nombre = a?.nombre ?? "—";
+                      const qty = Number(a?.qty || a?.cantidad || 0);
+                      const monto = Number(a?.monto || a?.precio || 0) * qty;
+                      return `<li>${nombre} — ${qty} pzas — $${monto.toFixed(2)}</li>`;
+                  }).join("")}
+                </ul>`
+            : `<div style="color:#666">Sin productos registrados en este ticket</div>`;
+
+        // 🔥 CLAVE: Usamos la clase 'corte-row' para heredar la mano y los estilos de selección.
+        // Pasamos el objeto del ticket y 'this' a la misma función mostrarDetalle()
+        html += `
+            <tr class="corte-row" tabindex="0" onclick="mostrarDetalleTicket(${JSON.stringify(t).replace(/"/g, '&quot;')}, this)">
+                <td>${fechaMX}</td>
+                <td>${horaMX}</td>
+                <td><strong>#${t.id || t.ticket_id || i + 1}</strong></td>
+                <td>${t.usuario || "—"}</td>
+                <td>${t.estacion || t.station || "—"}</td>
+                <td>${(t.metodo_pago || t.payment_method || 'Efectivo').toUpperCase()}</td>
+                <td><strong>$${Number(t.total || t.monto || 0).toFixed(2)}</strong></td>
+            </tr>
+            <tr id="detalle-ticket-row-${i}" class="hidden">
+                <td colspan="7">${detalleHTML}</td>
+            </tr>`;
+    });
+
+    html += `</table>`;
+    destino.innerHTML = html;
+
+    const firstRow = destino.querySelector(".corte-row");
+    if (firstRow) firstRow.focus();
+}
+
+/* ========================================================
+   RENDER PARA MOSTRAR EL DETALLE DE TICKETS VENDIDOS
+   ======================================================== */
+function mostrarDetalleTicket(objetoTicket, elementoFila) {
+    // 1. Apagar el color azul en cualquier otra fila que haya estado seleccionada antes
+    document.querySelectorAll('.corte-row').forEach(tr => {
+        tr.classList.remove('fila-seleccionada');
+    });
+    
+    // 2. Encender el color azul únicamente en el ticket seleccionado
+    if (elementoFila) {
+        elementoFila.classList.add('fila-seleccionada');
+    }
+
+    // 3. Poblar el lateral derecho o la modal de desglose (Adaptado a tus IDs de panel)
+    const panelTitulo = document.getElementById('detalle-fecha'); // ID de tu cabecera lateral
+    const panelContenido = document.getElementById('detalle-contenido'); // ID de tu cuerpo lateral
+
+    if (panelTitulo && panelContenido) {
+        const [fechaMX, horaMX] = mxFechaHora ? mxFechaHora(objetoTicket.fecha) : [objetoTicket.fecha, ''];
+        
+        panelTitulo.textContent = `Ticket #${objetoTicket.id || 'Venta'} - ${fechaMX}`;
+
+        const articulos = objetoTicket.articulos && typeof objetoTicket.articulos === "object" 
+            ? Object.values(objetoTicket.articulos) 
+            : (objetoTicket.articulos || []);
+
+        let listaArticulosHtml = "";
+        articulos.forEach(a => {
+            const nombre = a?.nombre ?? "—";
+            const qty = Number(a?.qty || a?.cantidad || 0);
+            const precioUnitario = Number(a?.precio || 0);
+            const subtotal = qty * precioUnitario;
+            listaArticulosHtml += `<li>• ${nombre} ($${precioUnitario.toFixed(2)}) — ${qty} pzas — $${subtotal.toFixed(2)}</li>`;
+        });
+
+        // Inyectamos los datos generales de la venta en tu panel lateral derecho
+        panelContenido.innerHTML = `
+            <div style="font-size: 13px; line-height: 1.6; color: #333;">
+                <p><strong>Cajera/Usuario:</strong> ${objetoTicket.usuario || '—'}</p>
+                <p><strong>Estación de venta:</strong> ${objetoTicket.estacion || objetoTicket.station || 'Principal'}</p>
+                <p><strong>Hora de emisión:</strong> ${horaMX}</p>
+                <p><strong>Método de Pago:</strong> ${(objetoTicket.metodo_pago || 'Efectivo').toUpperCase()}</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 10px 0;">
+                <p><strong>Artículos vendidos:</strong></p>
+                <ul style="padding-left: 15px; margin: 0; list-style: none;">
+                    ${listaArticulosHtml}
+                </ul>
+                <hr style="border: none; border-top: 2px dashed #ccc; margin: 15px 0;">
+                <p style="font-size: 16px; color: #059669;"><strong>TOTAL TRANSACCIÓN: $${Number(objetoTicket.total || 0).toFixed(2)}</strong></p>
+            </div>
+        `;
+
+        // Removemos la clase hidden de tu panel lateral derecho para que se despliegue elegantemente
+        document.getElementById('detalle-panel')?.classList.remove('hidden');
+    }
+}
 
 
  function  exportCSV(filename,  rows){
@@ -270,7 +459,18 @@ function renderLista(arr, destino) {
 }
 
 
- function  mostrarDetalle(corte) {
+ function  mostrarDetalle(corte, elementoFila) {
+
+    // Quitamos la marca a cualquier otra fila que haya estado seleccionada antes
+    document.querySelectorAll('.report-results table tbody tr').forEach(tr => {
+        tr.classList.remove('fila-seleccionada');
+    });
+    
+    // Le agregamos el color fijo a la fila en la que se acaba de hacer clic
+    if (elementoFila) {
+        elementoFila.classList.add('fila-seleccionada');
+    }
+
     const  panel  = document.getElementById("detalle-panel");
     const  contenido  = document.getElementById("detalle-contenido");
     const  fechaLabel  = document.getElementById("detalle-fecha");
