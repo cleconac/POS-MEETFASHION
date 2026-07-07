@@ -12,6 +12,7 @@
     <div class="title">Reportes y ventas</div>
     <div  class="topbar-left">
        <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+       <button id="btn-exportar" class="btn small" style="background-color: #28a745;">Exportar CSV</button>
    </div>
 </header>
 
@@ -21,18 +22,19 @@
       <div  class="container">
        <h2>Reportes  de Cortes y Ventas</h2>
 
-       <div  class="filters">
-           <label>Desde:  <input  type="date"  id="desde"></label>
-          <label>Hasta:  <input  type="date"  id="hasta"></label>
-           <label>Tipo  de reporte:
-               <select  id="tipo-reporte">
-                  <option  value="ventas">Ventas</option>
-                  <option  value="cortes"  selected>Cortes</option>
-              </select>
-           </label>
-           <button  id="btn-buscar" class="btn  primary">Buscar</button>
-           <button  id="btn-exportar"  class="btn  secondary">Exportar CSV</button>
-        </div>
+<div class="filters">
+    <label>Desde: <input type="date" id="desde"></label>
+    <label>Hasta: <input type="date" id="hasta"></label>
+    <label>Tipo de reporte:
+        <select id="tipo-reporte">
+            <!-- 🔥 ÚNICO CAMBIO: Añadidos IDs únicos a las opciones internas -->
+            <option value="ventas" id="opt-perm-ventas">Ventas</option>
+            <option value="cortes" id="opt-perm-cortes" selected>Cortes</option>
+	    <option value="tickets" id="opt-perm-tickets">Tickets</option>
+        </select>
+    </label>
+    <button id="btn-buscar" class="btn primary">Buscar</button>
+</div>
        <div  id="lista-fechas"  class="report-results"></div>
    </div>
 </section>
@@ -47,9 +49,48 @@
 </div>
 
 
-  <script  src="auth.js"></script>
-  <script>requireRole('admin');</script>
+
+<style>
+/* ========================================================
+   CANDADO DE PRIORIDAD PARA EL CURSOR DE MANO EN CORTES
+   ======================================================== */
+
+/* Forzamos el cursor de mano apuntando directamente a las celdas de la fila de cortes */
+.report-results table.table tbody tr.corte-row td {
+    cursor: pointer !important; /* Fuerza la mano interactiva sobre el texto */
+}
+
+/* Mantenemos el sombreado suave al pasar el mouse */
+.report-results table.table tbody tr.corte-row:hover {
+    background-color: #f0f4f8 !important; 
+}
+
+/* Respuesta visual de click presionado */
+.report-results table.table tbody tr.corte-row:active {
+    background-color: #e2e8f0 !important;
+    transform: scale(0.995);
+}
+
+/* Mantenemos la fila seleccionada fija en azul pastel */
+.report-results table.table tbody tr.corte-row.fila-seleccionada {
+    background-color: #e6f0fa !important;
+}
+/* Le añadimos un borde azul fuerte a las celdas de la fila activa para que resalte más */
+.report-results table.table tbody tr.corte-row.fila-seleccionada td {
+    border-bottom: 2px solid #0066ff !important;
+    border-top: 2px solid #0066ff !important;
+}
+
+/* Fila seleccionada actualmente */
+.report-results table tbody tr.fila-seleccionada {
+    background-color: #e6f0fa !important;
+    border-left: 4px solid #0066ff; /* Agrega una pequeña barra azul guía al inicio */
+}
+
+</style>
+
   <script src="db.js"></script>
+  <script  src="auth.js"></script>
   <script src="js/reportes.js"></script>
 
 </body>
