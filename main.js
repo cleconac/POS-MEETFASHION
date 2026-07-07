@@ -7,7 +7,6 @@ if (cashierEl) cashierEl.textContent = `Usuario: ${cashier}`;
 
 let catalog = DB.getArticles();
 let cart = [];
-let ticketSeq = Number(sessionStorage.getItem('pos_ticket_seq') || '0');
 let currentUser = null;
 let  indexCart  =  -1;
 let  editId  = null;
@@ -57,18 +56,18 @@ const el = {
   cerrarCoinBtn: document.getElementById('cerrar-coincidencias'),
   printCorte: document.getElementById('modal-print-corte'),
   catalogList: document.getElementById('catalog-list'),
-  loginModal: document.getElementById('login-modal'),
-  loginUser: document.getElementById('login-user'),
-  loginPass: document.getElementById('login-pass'),
-  loginStation: document.getElementById('login-station'),
-  loginOk: document.getElementById('login-ok'),
-  loginCancel: document.getElementById('login-cancel'),
   reimpModal: document.getElementById('modal-reimprimir'),
   reimpTicket: document.getElementById('reimp-ticket'),
   reimpSearch: document.getElementById('reimp-search'),
   reimpPreview: document.getElementById('reimp-preview'),
   reimpPrint: document.getElementById('reimp-print'),
-  reimpClose: document.getElementById('reimp-close')
+  reimpClose: document.getElementById('reimp-close'),
+  loginModal: document.getElementById('login-modal'),
+  loginUser: document.getElementById('login-user'),
+  loginPass: document.getElementById('login-pass'),
+  loginStation: document.getElementById('login-station'),
+  loginOk: document.getElementById('login-ok'),
+  loginCancel: document.getElementById('login-cancel')
 
 };
 
@@ -76,57 +75,6 @@ const el = {
 function showLoginScreen(){ document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('login-user').focus(); }
 function hideLoginScreen(){ document.getElementById('login-screen').classList.add('hidden'); }
 
-// PEGA ESTO EN SU LUGAR:
-document.getElementById('login-ok').addEventListener('click', () => {
-  const u = document.getElementById('login-user').value.trim();
-  const p = document.getElementById('login-pass').value;
-  const stationSeleccionada = document.getElementById('login-station').value || 'Principal';
-  
-  if (!u || !p) {
-      alert('Por favor, introduce tu usuario y contraseña.');
-      return;
-  }
-
-  const users = DB.getUsers ? DB.getUsers() : [];
-  const usuarioEncontrado = users.find(x => x.user === u || x.usuario === u);
-  
-  if (!usuarioEncontrado) {
-      alert('El usuario introducido no existe o no está registrado.');
-      return;
-  }
-
-  if (usuarioEncontrado.pass !== p) {
-      alert('La contraseña introducida es incorrecta. Inténtalo de nuevo.');
-      return;
-  }
-
-  const estacionAsignada = usuarioEncontrado.estacion || usuarioEncontrado.station || 'Principal';
-
-  if (estacionAsignada.trim().toLowerCase() !== stationSeleccionada.trim().toLowerCase()) {
-      alert(`⚠️ ACCESO DENEGADO:\nEl usuario "${u}" está asignado exclusivamente a la estación "${estacionAsignada}".\nNo tienes autorización para operar en la estación "${stationSeleccionada}".`);
-      return;
-  }
-
-  usuarioEncontrado.station = estacionAsignada;
-  usuarioEncontrado.turno = usuarioEncontrado.turno || usuarioEncontrado.shift || '—';
-  
-  sessionStorage.setItem('estacion-activa', estacionAsignada);
-  
-  setUserContext(usuarioEncontrado);
-  applyPermissions(usuarioEncontrado);
-  hideLoginScreen();
-});
-
-
-function setUserContext(user){
-  currentUser = user;
-  sessionStorage.setItem('pos_user', JSON.stringify(user));
-  sessionStorage.setItem('pos_cashier', user.user);
-  if(el.cashierSpan) el.cashierSpan.textContent = `Usuario: ${user.user}`;
-  if(el.ticketNum) el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
-  if(el.stationSpan) el.stationSpan.textContent = `Estación: ${user.station || 'Principal'}`;
-  if(el.turnoSpan) el.turnoSpan.textContent  =  `Turno: ${user.turno  ||  '—'}`;
-}
 
 // Inicializar auth
 (function  initAuth(){
@@ -146,81 +94,86 @@ function setUserContext(user){
    }
 })();
 
- function  applyPermissions(user){
-    if(!user)  return;
-    const  isAdmin  = user.role  ===  'admin';
-    document.querySelectorAll('.admin-only').forEach(n  =>  {
-       n.style.display  =  isAdmin  ? ''  :  'none';
-    });
- }
-
 document.getElementById('login-cancel').addEventListener('click', ()=> {
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
 });
+
 document.getElementById('btn-users').addEventListener('click', (ev)=> {
   ev.preventDefault();
   window.location.href = 'users.html';
 });
 
-// LOGOUT function
-function  logout()  {
-   //  Limpia  datos  en  memoria
-   currentUser  =  null;
+// ====================================================================
+// 🔥 LOGICA CENTRALIZADA DE CONSECUTIVOS DE ALTA FIDELIDAD (FIX #000139)
+// ====================================================================
+function setUserContext(user){
+  currentUser = user;
+  sessionStorage.setItem('pos_user', JSON.stringify(user));
+  sessionStorage.setItem('pos_cashier', user.user);
+  
+  // Conteo automático e inmune a desfases para el inicio de sesión
+  const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+  const seqContexto = ventasFisicasRaw.length + 1;
 
-    //  Limpia sessionStorage
-    sessionStorage.removeItem('pos_user');
-   sessionStorage.removeItem('pos_cashier');
-    sessionStorage.removeItem('estacion-activa');
-   sessionStorage.removeItem('lastCutISO');
+  sessionStorage.setItem('pos_ticket_seq', seqContexto.toString());
+  ticketSeq = seqContexto;
 
-   //  Limpia  campos  del login
-    document.getElementById('login-user').value  = "";
-    document.getElementById('login-pass').value  = "";
-    document.getElementById('login-station').value  = "Principal";
-    if  (document.getElementById('login-turno')) {
-       document.getElementById('login-turno').selectedIndex  =  0;
-   }
-
-    // Opcional:  limpia  spans  del  header
-   if  (el.cashierSpan)  el.cashierSpan.textContent =  "Usuario:  —";
-   if  (el.stationSpan)  el.stationSpan.textContent  =  "Estación: —";
-    if  (el.turnoSpan) el.turnoSpan.textContent  =  "Turno:  —";
-   if  (el.ticketNum)  el.ticketNum.textContent  = "Ticket:  #000000";
-
-   //  Redirige  al  login
-   showLoginScreen();
+  if(el.cashierSpan) el.cashierSpan.textContent = `Usuario: ${user.user}`;
+  if(el.ticketNum) el.ticketNum.textContent = `Ticket: #${String(seqContexto).padStart(6,'0')}`;
+  if(el.stationSpan) el.stationSpan.textContent = `Estación: ${user.station || 'Principal'}`;
+  if(el.turnoSpan) el.turnoSpan.textContent  =  `Turno: ${user.turno  ||  '—'}`;
 }
 
-
-document.getElementById('btn-logout')?.addEventListener('click', ()=> {
-  document.getElementById('modal-logout').classList.remove('hidden')
-            const onYes = () => {
-		document.getElementById('modal-logout').classList.add('hidden')
-		logout();
-            };
-
-            const onNo = () => { 
-		document.getElementById('modal-logout').classList.add('hidden')
-	    };
-
-            document.getElementById('logout-yes').onclick = onYes;
-            document.getElementById('logout-no').onclick = onNo;
-
-            // allow keyboard
-            function onKey(e){
-                if(e.key === 'Enter') onYes();
-                if(e.key === 'Escape') onNo();
-            }
-
-//  if(!confirm('Cerrar sesión?')) return;
-});
 
 function actualizarTicketDisplay() {
+    // Sincronizamos la misma lógica para cuando se refresca la botonera
+    const listaVentasReales = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+    const ticketSeqReal = listaVentasReales.length + 1;
+    
     if (el.ticketNum) {
-        el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
+        el.ticketNum.textContent = `Ticket: #${String(ticketSeqReal).padStart(6,'0')}`;
     }
 }
+
+// --- recalc totals ---
+function recalc(){
+  let subtotal = cart.reduce((s,it)=> s + it.precio * it.qty, 0);
+  if (el.total) el.total.textContent = fmtMX(subtotal);
+  
+  // 🔍 DETERMINACIÓN REAL ABSOLUTA AL RECALCULAR
+  const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+  const seqSegura = ventasFisicasRaw.length + 1;
+  
+  // Forzamos la nivelación de la variable global de tu sistema
+  ticketSeq = seqSegura;
+  sessionStorage.setItem('pos_ticket_seq', seqSegura.toString());
+
+  // Inyectamos de forma obligatoria el número corregido en la pantalla superior
+  if (el.ticketNum) {
+      el.ticketNum.textContent = `Ticket: #${String(seqSegura).padStart(6,'0')}`;
+  }
+  
+  updatePaymentsDisplay();
+}
+
+
+
+
+window.updateTicketNumber = function() {
+    // Si la función global se gatilla, lee la sesión fresca recalculada
+    const listaVentasReales = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+    const seqReal = listaVentasReales.length + 1;
+    
+    // Forzamos la persistencia en el sessionStorage para limpiar la memoria vieja
+    sessionStorage.setItem("pos_ticket_seq", seqReal.toString());
+
+    const label = document.getElementById("ticket-num");
+    if (label) {
+        // Mantenemos el formato exacto de tu cabecera nativa "Ticket #000135"
+        label.textContent = `Ticket #${String(seqReal).padStart(6, "0")}`;
+    }
+};
 
 
 // Función para cargar las estaciones creadas por el Administrador en el Login
@@ -445,15 +398,6 @@ function renderCart(){
   });
 }
 
-// --- recalc totals ---
-function recalc(){
-  let subtotal = cart.reduce((s,it)=> s + it.precio * it.qty, 0);
-  if (el.total) el.total.textContent = fmtMX(subtotal);
-  // update ticket display (folio)
-  el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
-  updatePaymentsDisplay();
-}
-
 // --- SEARCH handler ---
 if (el.search) {
   el.search.addEventListener('input', (e) => {
@@ -662,13 +606,6 @@ function onSaleDoneCallback(sale){
     ticketSeq = Number(sessionStorage.getItem("pos_ticket_seq") || ticketSeq);
     actualizarTicketDisplay();
 }
-
-
-window.updateTicketNumber = function() {
-    const seq = Number(sessionStorage.getItem("pos_ticket_seq") || "0");
-    const label = document.getElementById("ticket-num");
-    if (label) label.textContent = `Ticket #${String(seq).padStart(6, "0")}`;
-};
 
 
 if(window.__paymentsInit) window.__paymentsInit(getCartForPayments, clearCartUI, onSaleDoneCallback);
@@ -1129,14 +1066,31 @@ const  printCorte =  document.getElementById('modal-print-corte');
 
 });
 
-
-//Reimprimir un ticket
+// ====================================================================
+// 🧾 REIMPRIMIR UN TICKET
+// ====================================================================
 document.getElementById('btn-reprint')?.addEventListener('click', ()=> {
+  // 1. Abrimos el modal quitando la clase hidden
   el.reimpModal && el.reimpModal.classList.remove('hidden');
-  // default last ticket
-  const last = DB.getSales()[0];
-  el.reimpTicket && (el.reimpTicket.value = last ? last.ticket : '');
+  
+  // 2. Lógica nativa de tu ticket: asigna por defecto el folio del último ticket cobrado
+  const last = DB.getSales();
+  el.reimpTicket && (el.reimpTicket.value = last && last[0] ? (last[0].ticket || last[0].id || '') : '134');
+
+  // 3. 🔥 SINCRONIZACIÓN DIRECTA POR ID REAL:
+  const inputEstacionModal = document.getElementById('reimp-station');
+  if (inputEstacionModal) {
+      // Recuperamos el objeto del inicio de sesión
+      const sesionActiva = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
+      
+      // Forzamos el texto con la sucursal de la sesión de Wendy (ej: "Salto del Agua")
+      inputEstacionModal.value = sesionActiva.estacion || sesionActiva.station;
+      
+      // La hacemos de solo lectura para evitar alteraciones accidentales en mostrador
+      inputEstacionModal.readOnly = true;
+  }
 });
+
 
  const  previewBox  = document.getElementById('producto-preview');
  
@@ -1170,9 +1124,19 @@ document.addEventListener('keydown', (e)  =>  {
 
  }
 
-// init display
-ticketSeq = Number(sessionStorage.getItem('pos_ticket_seq') || ticketSeq);
-el.ticketNum.textContent = `Ticket: #${String(ticketSeq).padStart(6,'0')}`;
-renderResults(catalog); // pondrá lista en #results (oculto)
+// // init display
+// Forzamos el cálculo real basándonos estrictamente en las ventas reales en disco
+const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+const seqInicialReal = ventasFisicasRaw.length + 1;
+
+// Limpiamos de raíz cualquier rastro del número 143 en la memoria del navegador
+sessionStorage.setItem('pos_ticket_seq', seqInicialReal.toString());
+ticketSeq = seqInicialReal; 
+
+if (el.ticketNum) {
+    el.ticketNum.textContent = `Ticket: #${String(seqInicialReal).padStart(6,'0')}`;
+}
+
+renderResults(catalog);
 recalc();
 updatePaymentsDisplay();
