@@ -38,7 +38,7 @@
 	   <th>Acciones</th>
        </tr>
    </thead>
-   <tbody  id="stations-list"></tbody>
+   <tbody  id="stations-table-body"></tbody>
 </table>
 </div>
 
@@ -56,62 +56,86 @@
    </div>
 </div>
 
-<script  src="auth.js"></script>
-<script>requireRole('admin');</script>
 <script src="db.js"></script>
+<script  src="auth.js"></script>
 <script>
 
  window.addEventListener('DOMContentLoaded',  ()  => {
-     DB.getStations();
+     renderStations();
 });
 
+let editId = null; 
+
 function saveStation(){
-    const nameIn  =  document.getElementById('u-station').value.trim();
-   if  (!nameIn)  return alert('Estación  requerido');
+    const nameIn = document.getElementById('u-station').value.trim();
+    if (!nameIn) return alert('Estación requerida');
 
-    // 1. Obtener la lista actual de arreglos desde la DB
-    const listaActual = DB.getStations();
+    let listaActual = DB.getStations();
 
-    // 2. Validar que no se repitan nombres
-    if (listaActual.some(e => e.nombre.toLowerCase() === nameIn.toLowerCase())) {
-        return alert('Esta estación ya existe.');
+    // 2. LOGICA DE ACTUALIZACIÓN VS CREACIÓN
+    if (editId !== null) {
+
+	// MODO EDITAR: Validar que el nuevo nombre no lo tenga OTRA estación diferente a la que edito
+        const existeDuplicado = listaActual.some(e => e.nombre.toLowerCase() === nameIn.toLowerCase() && e.id !== editId);
+        if (existeDuplicado) {
+            return alert('Este nombre de estación ya está en uso.');
+        }
+
+        // MODO EDITAR: Reemplaza el elemento que coincide con el nombre viejo (editId)
+        listaActual = listaActual.map(e => {
+            if (e.id === editId || e.nombre === editId) { 
+                return {
+                    ...e,
+                    nombre: nameIn, // Aplica el nuevo nombre editado
+                    modified: new Date().toISOString() // Actualiza la fecha
+                };
+            }
+            return e;
+        });
+        
+        editId = null; // Limpia la variable para la siguiente operación
+        
+    } else {
+        // MODO CREAR: Valida que no exista duplicado antes de añadir
+        if (listaActual.some(e => e.nombre.toLowerCase() === nameIn.toLowerCase())) {
+            return alert('Esta estación ya existe.');
+        }
+
+        const nuevaEstacion = {
+            id: Date.now().toString(),
+            modified: new Date().toISOString(),
+            nombre: nameIn,
+            activa: true
+        };
+        listaActual.push(nuevaEstacion);
     }
 
-    // 3. Construir el nuevo objeto respetando tus propiedades
-    const nuevaEstacion = {
-        id: Date.now().toString(),
-        nombre: nameIn,
-        activa: true
-    };
-
-    // 4. Agregar el objeto al array existente
-    listaActual.push(nuevaEstacion);
-
-    // 5. Enviar la LISTA COMPLETA a tu DB
+    // 3. GUARDAR Y REFRESCAR LA PANTALLA
     DB.saveStations(listaActual);
 
-    // 6. Limpiar el formulario y cerrar modal
     document.getElementById('u-station').value = '';
     cerrarModal();
-    
-    // 7. Refrescar la tabla
     renderStations();
 }
 
-// --- ELIMINAR ESTACIÓN ---
-function eliminarEstacion(id) {
-    const listaActual = DB.getStations();
-    
-    // Restricción de seguridad: no dejar el negocio con cero cajas
-    if (listaActual.length <= 1) {
-        return alert('Debe quedar al menos una estación activa en el sistema.');
-    }
+// 5. ELIMINACIÓN LIMPIA POR ID ÚNICO
+function deleteStation(id){
+  const listaActual = DB.getStations();
+  if (listaActual.length <= 1) {
+      return alert('Debe quedar al menos una estación activa en el sistema.');
+  }
 
-    if (confirm('¿Seguro que deseas eliminar esta estación?')) {
-        // Ejecutamos tu función central pasándole el ID
-        DB.deleteStations(id); 
-        renderStations(); // Recargar la tabla
-    }
+  // Buscamos el objeto para mostrar su nombre real en la alerta
+  const estacionABorrar = listaActual.find(x => x.id === id);
+  const nombreMostrar = estacionABorrar ? estacionABorrar.nombre : "esta estación";
+
+  if(!confirm(`¿Eliminar la estación "${nombreMostrar}"?`)) return;
+  
+  // Filtramos removiendo exclusivamente el ID seleccionado
+  const nuevaLista = listaActual.filter(x => x.id !== id);
+  
+  DB.saveStations(nuevaLista);
+  renderStations();
 }
 
 function abrirModalNuevaEstacion(){
@@ -122,48 +146,108 @@ function abrirModalNuevaEstacion(){
   document.getElementById('modal-station').classList.remove('hidden');
 }
 
-function abrirModalEditarEstacion(u){
-  const obj = DB.getStations().find(x => x.station === u);
+function abrirModalEditarEstacion(id){
+  // 1. Buscamos la estación usando su ID único
+  const obj = DB.getStations().find(x => x.id === id || x.nombre === id);
   if (!obj) return;
-  editId = u;
+  
+  // 2. Guardamos el ID único (o el nombre si es la estación 'Principal' vieja de respaldo)
+  editId = obj.id || obj.nombre; 
+  
   document.getElementById('modal-title-station').textContent = 'Editar estación';
-  document.getElementById('u-station').value = obj.station;
-  document.getElementById('u-station').readOnly = true;
+  document.getElementById('u-station').value = obj.nombre;
+  document.getElementById('u-station').readOnly = false;
   document.getElementById('modal-station').classList.remove('hidden');
 }
 
+
 function editStation(u){
-  const obj = DB.getStations().find(x=>x.station===u);
+  const obj = DB.getStations().find(x=>x.nombre===u);
   if(!obj) return;
-  document.getElementById('u-station').value = obj.station;
+  document.getElementById('u-station').value = obj.nombre;
 }
 
-function  renderStations(){
-   const  ul =  document.getElementById('stations-list');
-   if (!ul) return;
-   const  stations =  DB.getStations();
-   ul.innerHTML  = '';
-   stations.forEach(u  =>  {
-      const  tr =  document.createElement('tr');
-      tr.innerHTML  =  `
-         <td><strong>${u.station}</strong></td>
-          <td>${u.modified  ? new  Date(u.modified).toLocaleString()  : '-'}</td>
-          <td>
-             <button  class="small-btn" onclick="abrirModalEditarEstacion('${u.station}')">Editar</button>
-             <button  class="small-btn"  onclick="deleteStation('${u.station}')">Eliminar</button>
-         </td>`;
-       ul.appendChild(tr);
-   });
+// 1. Capturar de forma segura la sesión del administrador activo
+const activeStationUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
+
+// 2. FUNCIÓN PARA CONTROLAR LA CABECERA (BOTÓN AGREGAR ESTACIÓN)
+function validarCabeceraEstaciones() {
+    if (!activeStationUserSession) return;
+
+    const aliasLogueado = (activeStationUserSession.user || activeStationUserSession.usuario || '').toLowerCase();
+    const rolLogueado = (activeStationUserSession?.role || activeStationUserSession?.rol || '').toLowerCase();
+    const esMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin' || rolLogueado === 'master';
+    
+    // Leemos la casilla específica del árbol: estaciones -> crear
+    const puedeCrear = esMaestro || (activeStationUserSession.permisos?.estaciones?.crear || false);
+
+    // Localizamos tu botón superior para añadir cajas físicas
+    const btnAgregarEstacion = document.getElementById('btn-add-station-top') || document.querySelector('button[onclick*="abrirModalNuevaEstacion"]');
+    
+    if (btnAgregarEstacion) {
+        // Si no tiene el permiso marcado, el botón desaparece de la cabecera
+        btnAgregarEstacion.style.display = puedeCrear ? '' : 'none';
+    }
 }
 
-function deleteStation(u){
-  if(!confirm('Eliminar estación?')) return;
-  DB.deleteStations(u);
-  renderStations();
+// 3. ACTUALIZAR EL RENDERIZADOR DE LA TABLA DE ESTACIONES
+function renderStations() {
+    const tbody = document.getElementById('stations-table-body'); // Usa tu ID de tabla real
+    if (!tbody) return;
+    
+    const listaEstaciones = DB.getStations ? DB.getStations() : [];
+    tbody.innerHTML = '';
+
+    const aliasLogueado = (activeStationUserSession?.user || activeStationUserSession?.usuario || '').toLowerCase();
+    const rolLogueado = (activeStationUserSession?.role || activeStationUserSession?.rol || '').toLowerCase();
+    const esMaestro = rolLogueado === 'master';
+    
+    // Recuperamos las llaves del subobjeto de estaciones del árbol
+    const p = esMaestro ? { editar: true, eliminar: true } : (activeStationUserSession?.permisos?.estaciones || {});
+
+    listaEstaciones.forEach(est => {
+        const tr = document.createElement('tr');
+        
+        let botonEditarHtml = '';
+        let botonEliminarHtml = '';
+
+        // Evaluar permiso para Editar Caja
+        if (esMaestro || p.editar) {
+            botonEditarHtml = `<button class="btn small" style="background-color: #0066ff;" onclick="abrirModalEditarEstacion('${est.nombre}')">✏️ Editar</button>`;
+        }
+
+        // Evaluar permiso para Eliminar Caja
+        if (esMaestro || p.eliminar) {
+            // Candado preventivo: No dejar eliminar la estación "Principal" o "Salto del Agua" base para evitar errores en cascada
+            if (est.nombre.toLowerCase() === 'principal' || est.nombre.toLowerCase() === 'salto del agua') {
+                botonEliminarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="Estación base del sistema imborrable.">🗑️ Eliminar</button>`;
+            } else {
+                botonEliminarHtml = `<button class="btn small" style="background-color: #dc3545;" onclick="deleteStation('${est.id || est.nombre}')">🗑️ Eliminar</button>`;
+            }
+        }
+
+        tr.innerHTML = `
+            <td><strong>${est.nombre}</strong></td>
+            <td>${est.modified ? new Date(est.modified).toLocaleString() : '—'}</td>
+            <td>
+                ${botonEditarHtml}
+                ${botonEliminarHtml}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
+
+// Disparar las validaciones en cuanto abre la pantalla de estaciones
+document.addEventListener("DOMContentLoaded", () => {
+    validarCabeceraEstaciones();
+    if (typeof renderStations === "function") renderStations();
+});
+
+
 
 function cerrarModal(){
-  document.getElementById('modal-estation').classList.add('hidden');
+  document.getElementById('modal-station').classList.add('hidden');
 }
 
 document.addEventListener("keydown", (event) => {
@@ -176,6 +260,7 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
+renderStations();
 
 </script>
 </body>
