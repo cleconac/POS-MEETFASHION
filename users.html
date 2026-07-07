@@ -25,6 +25,10 @@ function  initAutocomplete()  {
        }
    });
 }
+
+// Obtener de forma segura los datos del administrador que inició sesión en esta terminal
+const activeUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
+
 </script>
 
 </head>
@@ -34,7 +38,7 @@ function  initAutocomplete()  {
     <div class="title">Gestión de Usuarios</div>
     <div  class="topbar-left">
        <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
-       <button  class="btn small" onclick="abrirModalNuevo()">Agregar  usuario</button>
+       <button  class="btn small" onclick="abrirModalNuevo()">+ Agregar  usuario</button>
    </div>
 </header>
 <div class="container container-small">
@@ -48,6 +52,7 @@ function  initAutocomplete()  {
        <tr>
 	   <th>Usuario</th>
 	   <th>Nombre</th>
+	   <th>Rol</th>
 	   <th>Turno</th>
 	   <th>Estación</th>
 	   <th>Correo</th>
@@ -65,20 +70,39 @@ function  initAutocomplete()  {
       <h3  id="modal-title">Nuevo  usuario</h3>
       
        <div class="form-row">
-           <input id="u-user"  placeholder="Usuario  (login)">
-           <input  id="u-name"  placeholder="Nombre completo">
-           <!-- Campo de contraseña con el ojo integrado -->
-           <div class="password-wrapper" style="position: relative; display: flex; align-items: center; flex: 1;">
-               <input id="u-pass" placeholder="Contraseña" type="password" style="padding-right: 40px; width: 100%;">
-               <button type="button" id="toggle-u-pass" style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; color: #6c757d; z-index: 10;">
-                   👁️
-               </button>
+           <div>
+               <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Alias</label>
+               <input id="u-user" placeholder="Usuario (login)">
+           </div>
+           <div>
+               <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Nombre</label>
+               <input id="u-name" placeholder="Nombre completo">
+           </div>
+           
+           <!-- CORRECCIÓN CRÍTICA: Estructura limpia para el campo Contraseña -->
+           <div style="flex: 1; display: flex; flex-direction: column;">
+               <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Contraseña</label>
+               
+               <!-- El password-wrapper ahora solo envuelve al input y al ojo, alineándolos perfectamente -->
+               <div class="password-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
+                   <input id="u-pass" placeholder="Contraseña" type="password" style="padding-right: 40px; width: 100%;">
+                   <button type="button" id="toggle-u-pass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; color: #6c757d; z-index: 10;">
+                       👁️
+                   </button>
+               </div>
            </div>
        </div>
+
        
       <div  class="form-row">
+	<div>
+          <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Teléfono</label>
           <input  id="u-phone"  placeholder="Teléfono"  maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+	</div>
+	<div>
+          <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Correo</label>
           <input  id="u-mail"  placeholder="Email">
+	</div>
       </div> <!-- ✅ CORREGIDO: Cierre correcto de la fila de teléfono y correo -->
 
 	  <!-- SECCIÓN DE DIRECCIÓN INDEPENDIENTE Y FLOTANTE -->
@@ -93,9 +117,18 @@ function  initAutocomplete()  {
 	  </div> <!-- ✅ CORREGIDO: Cierre correcto de la sección de dirección -->
 
        <div  class="form-row">
-          <select  id="u-role"><option value="vendedor">Vendedor</option><option  value="admin">Administrador</option></select>
+	<div>
+          <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Rol de usuario</label>
+          <select  id="u-role"><option value="vendedor">👩‍💼 Vendedor</option><option  value="admin">🔑 Administrador</option><option value="master">👑 Master</option></select>
+	</div>
+	<div>
+          <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Turno</label>
           <select  id="u-shift"><option  value="matutino">Matutino</option><option  value="vespertino">Vespertino</option></select>
+	</div>
+	<div>
+          <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333;">Estación</label>
           <select  id="u-station"></select>
+	</div>
       </div>
       
        <div  class="form-row">
@@ -105,9 +138,81 @@ function  initAutocomplete()  {
    </div>
 </div>
 
+<!-- MODAL INDEPENDIENTE: ÁRBOL DE PERMISOS PARA ADMINISTRADORES -->
+<div id="modal-user-permissions" class="modal hidden">
+   <div class="modal-content" style="max-width: 550px; width: 95%; max-height: 85vh; overflow-y: auto;">
+      <h3 style="margin-top: 0; color: #1a1a1a; border-bottom: 2px solid #f1f3f5; padding-bottom: 10px;">
+          🔑 Configurar Permisos de Administrador
+      </h3>
+      <p id="perm-modal-user-title" style="font-weight: bold; color: #0066ff; margin-bottom: 15px; font-size: 14px;"></p>
+      
+      <form id="form-permisos-arbol" onsubmit="event.preventDefault();">
+          
+          <!-- + CATÁLOGO -->
+          <div style="margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label style="font-weight: bold; display: flex; align-items: center; gap: 6px; color: #1e293b; font-size: 14px;">
+                  <input type="checkbox" id="p-cat-ver"> 📦 + Catálogo (Habilitar Sección)
+              </label>
+              <div style="margin-left: 24px; margin-top: 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
+                  <label><input type="checkbox" id="p-cat-edit"> Editar (Botón)</label>
+                  <label><input type="checkbox" id="p-cat-del"> Eliminar (Botón)</label>
+                  <label><input type="checkbox" id="p-cat-stock"> Stock (Botón)</label>
+                  <label><input type="checkbox" id="p-cat-hist"> Historial (Botón)</label>
+                  <label><input type="checkbox" id="p-cat-new"> + Nuevo Artículo</label>
+                  <label><input type="checkbox" id="p-cat-imp"> Importar Catálogo</label>
+                  <label><input type="checkbox" id="p-cat-exp"> Exportar Catálogo</label>
+                  <label><input type="checkbox" id="p-cat-exphist"> Exportar Historial Stock</label>
+              </div>
+          </div>
+
+          <!-- + REPORTES -->
+          <div style="margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label style="font-weight: bold; display: flex; align-items: center; gap: 6px; color: #1e293b; font-size: 14px;">
+                  <input type="checkbox" id="p-rep-ver"> 📊 + Reportes (Habilitar Sección)
+              </label>
+              <div style="margin-left: 24px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                  <label><input type="checkbox" id="p-rep-ventas"> Ventas (Option)</label>
+                  <label><input type="checkbox" id="p-rep-cortes"> Cortes (Option)</label>
+                  <label><input type="checkbox" id="p-rep-exp"> Exportar CSV</label>
+              </div>
+          </div>
+
+          <!-- + USUARIOS -->
+          <div style="margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label style="font-weight: bold; display: flex; align-items: center; gap: 6px; color: #1e293b; font-size: 14px;">
+                  <input type="checkbox" id="p-user-ver"> 👥 + Usuarios (Habilitar Sección)
+              </label>
+              <div style="margin-left: 24px; margin-top: 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
+                  <label><input type="checkbox" id="p-user-edit"> Editar (Botón)</label>
+                  <label><input type="checkbox" id="p-user-del"> Eliminar (Botón)</label>
+                  <label><input type="checkbox" id="p-user-map"> Ver mapa (Botón)</label>
+                  <label><input type="checkbox" id="p-user-add"> Agregar usuario</label>
+              </div>
+          </div>
+
+          <!-- + ESTACIONES -->
+          <div style="margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label style="font-weight: bold; display: flex; align-items: center; gap: 6px; color: #1e293b; font-size: 14px;">
+                  <input type="checkbox" id="p-est-ver"> 🚉 + Estaciones (Habilitar Sección)
+              </label>
+              <div style="margin-left: 24px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                  <label><input type="checkbox" id="p-est-edit"> Editar (Botón)</label>
+                  <label><input type="checkbox" id="p-est-del"> Eliminar (Botón)</label>
+                  <label><input type="checkbox" id="p-est-add"> Agregar Estación</label>
+              </div>
+          </div>
+
+          <!-- Botones de Acción de la Modal -->
+          <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f3f5; padding-top: 15px;">
+              <button type="button" class="btn" onclick="guardarPermisosArbol()" style="background-color: #28a745;">Guardar Permisos</button>
+              <button type="button" class="btn alt" onclick="cerrarModalPermisos()">Cancelar</button>
+          </div>
+      </form>
+   </div>
+</div>
+
 
 <script  src="auth.js"></script>
-<script>requireRole('admin');</script>
 <script src="db.js"></script>
 <script>
 
@@ -167,25 +272,12 @@ function saveUser(){
    cerrarModal();
 }
 
-
-
-function editUser(u){
-  const obj = DB.getUsers().find(x=>x.user===u);
-  if(!obj) return;
-  document.getElementById('u-user').value = obj.user;
-  document.getElementById('u-name').value = obj.name || '';
-  document.getElementById('u-pass').value = obj.pass || '';
-  document.getElementById('u-phone').value = obj.phone || '';
-  document.getElementById('u-mail').value = obj.mail || '';
-  document.getElementById('u-address').value = obj.address || '';
-  document.getElementById('u-role').value = obj.role || 'vendedor';
-  document.getElementById('u-shift').value = obj.shift || 'matutino';
-}
 function deleteUser(u){
   if(!confirm('Eliminar usuario?')) return;
   DB.deleteUser(u);
   renderUsers();
 }
+
 function verifyAddress(encoded){
   if(!encoded) return alert('Sin dirección');
   window.open(`https://www.google.com/maps/search/?api=1&query=${encoded}`,'_blank');
@@ -207,6 +299,19 @@ function abrirModalNuevo(){
   poblarSelectorEstaciones(""); 
 
   document.getElementById('modal-user').classList.remove('hidden');
+}
+
+function editUser(u){
+  const obj = DB.getUsers().find(x=>x.user===u);
+  if(!obj) return;
+  document.getElementById('u-user').value = obj.user;
+  document.getElementById('u-name').value = obj.name || '';
+  document.getElementById('u-pass').value = obj.pass || '';
+  document.getElementById('u-phone').value = obj.phone || '';
+  document.getElementById('u-mail').value = obj.mail || '';
+  document.getElementById('u-address').value = obj.address || '';
+  document.getElementById('u-role').value = obj.role || 'vendedor';
+  document.getElementById('u-shift').value = obj.shift || 'matutino';
 }
 
 function abrirModalEditar(u){
@@ -241,31 +346,133 @@ document.addEventListener("keydown", (event) => {
             // Cerrar modal
             modal.classList.add("hidden");
 	}
+
+        const modalPermisos = document.getElementById("modal-user-permissions");
+        if (modalPermisos && !modalPermisos.classList.contains("hidden")) {
+            // Cerrar modal
+            modalPermisos.classList.add("hidden");
+	}
+
     }
 });
 
 
-function  renderUsers(){
-   const  ul =  document.getElementById('user-list');
-   const  users =  DB.getUsers();
-   ul.innerHTML  = '';
-   users.forEach(u  =>  {
-      const  tr =  document.createElement('tr');
-      tr.innerHTML  =  `
-         <td><strong>${u.user}</strong></td>
-          <td>${u.name  || ''}</td>
-          <td>${u.shift  || ''}</td>
-          <td>${u.estacion  || ''}</td>
-          <td>${u.mail  || ''}</td>
-          <td>${u.modified  ? new  Date(u.modified).toLocaleString()  : '-'}</td>
+function renderUsers(){
+   const ul = document.getElementById('user-list');
+   if (!ul) return; 
+   
+   const users = DB.getUsers();
+   ul.innerHTML = '';
+   
+   const aliasLogueado = (activeUserSession?.user || activeUserSession?.usuario || '').toLowerCase();
+   const rolLogueado = (activeUserSession?.role || activeUserSession?.rol || '').toLowerCase();
+   
+   // El operador actual es maestro si su alias es raíz o si ostenta el rol MASTER
+   const operadorEsElMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin' || rolLogueado === 'master';
+   const esMaestro = operadorEsElMaestro; // Mantenemos consistencia con tus variables internas
+   
+   const p = esMaestro ? { editar: true, eliminar: true, ver_mapa: true, crear: true } : (activeUserSession?.permisos?.usuarios || {});
+
+   users.forEach(u => {
+      const loginUser = u.user || '';
+      const rolUser = u.role || 'vendedor';
+      
+      const loginUserMinusculas = loginUser.toLowerCase();
+      const rolUserMinusculas = rolUser.toLowerCase();
+      
+      // La fila pertenece al maestro si cumple con el alias o si tiene el rol supremo
+      const esFilaDelMaestro = loginUserMinusculas === 'sup' || loginUserMinusculas === 'admin' || rolUserMinusculas === 'master';
+
+      let botonEditarHtml = '';
+      let botonEliminarHtml = '';
+      let botonMapaHtml = '';
+      let botonPermisosHtml = '';
+
+      // ✏️ EVALUAR BOTÓN EDITAR
+      if (esMaestro || p.editar) {
+          if (esFilaDelMaestro && !operadorEsElMaestro) {
+              // Si Wendy (admin) ve la fila de un MASTER, el botón se bloquea por seguridad
+              botonEditarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="No tienes permisos para alterar a un usuario MASTER.">✏️ Editar</button>`;
+          } else {
+              botonEditarHtml = `<button class="btn small" style="background-color: #0066ff;" onclick="abrirModalEditar('${loginUser}')">✏️ Editar</button>`;
+          }
+      }
+
+      // 🗑️ EVALUAR BOTÓN ELIMINAR
+      if (esMaestro || p.eliminar) {
+          if (esFilaDelMaestro) {
+              // Los perfiles MASTER son imborrables para mantener la estabilidad del POS
+              botonEliminarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="Los usuarios MASTER son imborrables para la seguridad del POS.">🗑️ Eliminar</button>`;
+          } else {
+              botonEliminarHtml = `<button class="btn small btn-eliminar-user" style="background-color: #dc3545;" onclick="deleteUser('${loginUser}')">🗑️ Eliminar</button>`;
+          }
+      }
+
+      // 📍 EVALUAR BOTÓN VER MAPA
+      if (esMaestro || p.ver_mapa) {
+          botonMapaHtml = `<button class="btn small btn-mapa-user" style="background-color: #17a2b8;" onclick="verifyAddress('${encodeURIComponent(u.address || '')}')">📍 Ver mapa</button>`;
+      }
+
+      // 🔑 EVALUAR BOTÓN PERMISOS
+      if (rolUserMinusculas === 'admin' || rolUserMinusculas === 'master') {
+          if (esFilaDelMaestro) {
+              // Si es un MASTER, muestra la insignia de control supremo indestructible
+              botonPermisosHtml = `<button class="btn small" disabled style="background:#059669; color:white; cursor:not-allowed;" title="Acceso Absoluto del Sistema">👑 Master</button>`;
+          } else if (esMaestro || p.crear || p.editar) { 
+              botonPermisosHtml = `<button class="btn small" onclick="abrirModalPermisos('${loginUser}')" style="background-color: #6f42c1; color: white;">🔑 Permisos</button>`;
+          }
+      }
+
+      // INYECCIÓN VISUAL CON LOS CANDADOS Y TEXTOS DE ROLES UNIFICADOS
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+         <td><strong>${loginUser}</strong></td>
+          <td>${u.name || ''}</td>
+          <td><span style="${esFilaDelMaestro ? 'color: #059669; font-weight: bold;' : ''}">${rolUser.toUpperCase()}</span></td>
+          <td>${u.shift || ''}</td>
+          <td>${esFilaDelMaestro ? '<span style="color: #64748b; font-weight: 500;">🌐 Acceso Global</span>' : (u.estacion || '—')}</td>
+          <td>${u.mail || ''}</td>
+          <td>${u.modified ? new Date(u.modified).toLocaleString() : '-'}</td>
           <td>
-             <button  class="small-btn" onclick="abrirModalEditar('${u.user}')">Editar</button>
-             <button  class="small-btn"  onclick="deleteUser('${u.user}')">Eliminar</button>
-             <button class="small-btn"  onclick="verifyAddress('${encodeURIComponent(u.address||'')}')">Ver  mapa</button>
+             ${botonEditarHtml}
+             ${botonEliminarHtml}
+             ${botonMapaHtml}
+             ${botonPermisosHtml}
          </td>`;
        ul.appendChild(tr);
    });
 }
+
+
+
+
+// FUNCIÓN PARA CONTROLAR ACCIONES DE CABECERA EN LA SECCIÓN DE USUARIOS
+function validarCandadosCabeceraUsuarios() {
+    if (!activeUserSession) return;
+
+    const aliasLogueado = (activeUserSession.user || activeUserSession.usuario || '').toLowerCase();
+    const esMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin';
+    
+    // Leemos la casilla específica de "Agregar usuario" (crear)
+    const puedeCrear = esMaestro || (activeUserSession.permisos?.usuarios?.crear || false);
+
+    // Buscamos tu botón azul superior de la captura
+    // Nota: Revisa que tu botón HTML tenga el ID "btn-add-user-top" o usa el querySelector
+    const btnAgregarUsuario = document.getElementById('btn-add-user-top') || document.querySelector('button[onclick*="abrirModalNuevo"]');
+    
+    if (btnAgregarUsuario) {
+        // Si no tiene el permiso, lo ocultamos por completo del panel superior
+        btnAgregarUsuario.style.display = puedeCrear ? '' : 'none';
+    }
+}
+
+// Forzamos la ejecución de las validaciones en cuanto la página de usuarios abre
+document.addEventListener("DOMContentLoaded", () => {
+    validarCandadosCabeceraUsuarios();
+    if (typeof renderUsers === "function") renderUsers();
+});
+
+
 
 // Control de visibilidad de la contraseña en la modal de usuarios
 document.addEventListener('click', function(event) {
@@ -396,6 +603,208 @@ document.addEventListener('click', (e) => {
 });
 
 
+// Función global de soporte para conceder acceso total automático
+function obtenerMapaAccesoTotal() {
+    return {
+        catalogo: { ver: true, editar: true, eliminar: true, stock: true, historial: true, nuevo: true, importar: true, exportar_cat: true, exportar_stock: true },
+        reportes: { ver: true, ventas: true, cortes: true, exportar: true },
+        usuarios: { ver: true, crear: true, editar: true, eliminar: true, ver_mapa: true },
+        estaciones: { ver: true, crear: true, editar: true, eliminar: true }
+    };
+}
+
+// ========================================================
+// CONTROL DINÁMICO DE CASILLAS PADRE e HIJOS EN EL ÁRBOL
+// ========================================================
+
+// Función para habilitar/deshabilitar los hijos según el estado del padre
+function actualizarEstadoHijos(idPadre, listaIdsHijos) {
+    const chkPadre = document.getElementById(idPadre);
+    if (!chkPadre) return;
+
+    listaIdsHijos.forEach(idHijo => {
+        const chkHijo = document.getElementById(idHijo);
+        if (chkHijo) {
+            // 🔥 CLAVE: Si el padre NO está checado, el hijo se bloquea (disabled = true)
+            chkHijo.disabled = !chkPadre.checked;
+            
+            // UX EXTRA: Si el padre se desmarca, desmarcamos automáticamente al hijo
+            if (!chkPadre.checked) {
+                chkHijo.checked = false;
+            }
+        }
+    });
+}
+
+// Función maestra que se ejecuta al abrir la modal y cada vez que cambia un padre
+function sincronizarTodosLosPermisos() {
+    // 1. Mapeo del módulo Catálogo
+    actualizarEstadoHijos('p-cat-ver', [
+        'p-cat-edit', 'p-cat-del', 'p-cat-stock', 'p-cat-hist', 
+        'p-cat-new', 'p-cat-imp', 'p-cat-exp', 'p-cat-exphist'
+    ]);
+
+    // 2. Mapeo del módulo Reportes (El de tu ejemplo visual)
+    actualizarEstadoHijos('p-rep-ver', [
+        'p-rep-ventas', 'p-rep-cortes', 'p-rep-exp'
+    ]);
+
+    // 3. Mapeo del módulo Usuarios
+    actualizarEstadoHijos('p-user-ver', [
+        'p-user-edit', 'p-user-del', 'p-user-map', 'p-user-add'
+    ]);
+
+    // 4. Mapeo del módulo Estaciones
+    actualizarEstadoHijos('p-est-ver', [
+        'p-est-edit', 'p-est-del', 'p-est-add'
+    ]);
+}
+
+// VINCULAR LOS ESCUCHADORES EN EL FORMULARIO
+function inicializarEscuchadoresArbolPermisos() {
+    // Escuchamos el clic de cada checkbox padre de la modal
+    document.getElementById('p-cat-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
+    document.getElementById('p-rep-ver')?.addEventListener('change', deleteEvent = sincronizarTodosLosPermisos);
+    document.getElementById('p-user-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
+    document.getElementById('p-est-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
+}
+
+// Variable global para recordar a qué administrador le estamos editando el árbol
+let currentPermissionsTargetUser = null;
+
+function abrirModalPermisos(loginUser) {
+    const lista = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    const usuario = lista.find(x => (x.user || x.usuario) === loginUser);
+    if (!usuario) return alert("Usuario no localizado.");
+
+    currentPermissionsTargetUser = loginUser;
+    document.getElementById('perm-modal-user-title').textContent = `Configurando accesos para el alias: @${loginUser} (${usuario.nombre || 'Administrador Seccional'})`;
+
+    // Si el usuario no tiene mapa de permisos guardado previamente, le creamos uno vacío por defecto
+    const p = usuario.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {} };
+
+    // CARGAR VALORES EN LOS CHECKBOXES DESDE LA BASE DE DATOS LOCAL
+    document.getElementById('p-cat-ver').checked = p.catalogo?.ver || false;
+    document.getElementById('p-cat-edit').checked = p.catalogo?.editar || false;
+    document.getElementById('p-cat-del').checked = p.catalogo?.eliminar || false;
+    document.getElementById('p-cat-stock').checked = p.catalogo?.stock || false;
+    document.getElementById('p-cat-hist').checked = p.catalogo?.historial || false;
+    document.getElementById('p-cat-new').checked = p.catalogo?.nuevo || false;
+    document.getElementById('p-cat-imp').checked = p.catalogo?.importar || false;
+    document.getElementById('p-cat-exp').checked = p.catalogo?.exportar_cat || false;
+    document.getElementById('p-cat-exphist').checked = p.catalogo?.exportar_stock || false;
+
+    document.getElementById('p-rep-ver').checked = p.reportes?.ver || false;
+    document.getElementById('p-rep-ventas').checked = p.reportes?.ventas || false;
+    document.getElementById('p-rep-cortes').checked = p.reportes?.cortes || false;
+    document.getElementById('p-rep-exp').checked = p.reportes?.exportar || false;
+
+    document.getElementById('p-user-ver').checked = p.usuarios?.ver || false;
+    document.getElementById('p-user-edit').checked = p.usuarios?.editar || false;
+    document.getElementById('p-user-del').checked = p.usuarios?.eliminar || false;
+    document.getElementById('p-user-map').checked = p.usuarios?.ver_mapa || false;
+    document.getElementById('p-user-add').checked = p.usuarios?.crear || false;
+
+    document.getElementById('p-est-ver').checked = p.estaciones?.ver || false;
+    document.getElementById('p-est-edit').checked = p.estaciones?.editar || false;
+    document.getElementById('p-est-del').checked = p.estaciones?.eliminar || false;
+    document.getElementById('p-est-add').checked = p.estaciones?.crear || false;
+
+    sincronizarTodosLosPermisos();
+    inicializarEscuchadoresArbolPermisos();
+
+    document.getElementById('modal-user-permissions').classList.remove('hidden');
+}
+
+function guardarPermisosArbol() {
+    let lista = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    
+    // 1. Recopilar el mapa completo del árbol (Tu bloque actual se queda igual)
+    const mapaPermisos = {
+        catalogo: {
+            ver: document.getElementById('p-cat-ver').checked,
+            editar: document.getElementById('p-cat-edit').checked,
+            eliminar: document.getElementById('p-cat-del').checked,
+            stock: document.getElementById('p-cat-stock').checked,
+            historial: document.getElementById('p-cat-hist').checked,
+            nuevo: document.getElementById('p-cat-new').checked,
+            importar: document.getElementById('p-cat-imp').checked,
+            exportar_cat: document.getElementById('p-cat-exp').checked,
+            exportar_stock: document.getElementById('p-cat-exphist').checked
+        },
+        reportes: {
+            ver: document.getElementById('p-rep-ver').checked,
+            ventas: document.getElementById('p-rep-ventas').checked,
+            cortes: document.getElementById('p-rep-cortes').checked,
+            exportar: document.getElementById('p-rep-exp').checked
+        },
+        usuarios: {
+            ver: document.getElementById('p-user-ver').checked,
+            editar: document.getElementById('p-user-edit').checked,
+            eliminar: document.getElementById('p-user-del').checked,
+            ver_mapa: document.getElementById('p-user-map').checked,
+            crear: document.getElementById('p-user-add').checked
+        },
+        estaciones: {
+            ver: document.getElementById('p-est-ver').checked,
+            editar: document.getElementById('p-est-edit').checked,
+            eliminar: document.getElementById('p-est-del').checked,
+            crear: document.getElementById('p-est-add').checked
+        }
+    };
+
+    // 2. Buscar al usuario modificado y actualizar su objeto en el arreglo maestro
+    lista = lista.map(u => {
+        if ((u.user || u.usuario) === currentPermissionsTargetUser) {
+            return { ...u, permisos: mapaPermisos };
+        }
+        return u;
+    });
+
+    // Guardar en la base de datos persistente (LocalStorage)
+    if (DB.saveUsers) {
+        DB.saveUsers(lista);
+    } else {
+        localStorage.setItem('usuarios', JSON.stringify(lista));
+    }
+
+    // ========================================================
+    // 🔥 CORRECCIÓN CRÍTICA: REFRESCO EN TIEMPO REAL SIN F5
+    // ========================================================
+    
+    // A. Si el administrador editado es el mismo que está operando en la terminal (ej: Wendy se auto-edita)
+    const usuarioActivoSesion = JSON.parse(sessionStorage.getItem('pos_user'));
+    if (usuarioActivoSesion && (usuarioActivoSesion.user || usuarioActivoSesion.usuario) === currentPermissionsTargetUser) {
+        usuarioActivoSesion.permisos = mapaPermisos;
+        
+        // Sincronizamos la base de datos de la sesión del navegador
+        sessionStorage.setItem('pos_user', JSON.stringify(usuarioActivoSesion));
+        
+        // Sincronizamos la variable global que lee renderUsers() de forma obligatoria
+        if (typeof activeUserSession !== 'undefined') {
+            activeUserSession.permisos = mapaPermisos;
+        }
+    }
+
+    alert("¡Árbol de permisos guardado y actualizado con éxito!");
+    
+    // 3. Cerrar la ventana y volver a pintar las cabeceras y filas con los nuevos candados al instante
+    cerrarModalPermisos();
+    
+    if (typeof validarCandadosCabeceraUsuarios === "function") {
+        validarCandadosCabeceraUsuarios(); // Evalúa de nuevo el botón azul superior "+ Agregar"
+    }
+    
+    if (typeof renderUsers === "function") {
+        renderUsers(); // Redibuja las filas de la tabla ocultando/mostrando Editar, Eliminar o Ver Mapa
+    }
+}
+
+
+function cerrarModalPermisos() {
+    document.getElementById('modal-user-permissions').classList.add('hidden');
+    currentPermissionsTargetUser = null;
+}
 
 </script>
 </body>
