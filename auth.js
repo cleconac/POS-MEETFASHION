@@ -69,39 +69,92 @@ document.getElementById('login-ok')?.addEventListener('click', () => {
     if (typeof setUserContext === "function") setUserContext(usuarioEncontrado);
     if (typeof applyPermissions === "function") applyPermissions(usuarioEncontrado);
     if (typeof hideLoginScreen === "function") hideLoginScreen();
+
+    window.location.reload();
 });
 
-// FUNCIÓN DE VALIDACIÓN PERIMETRAL BASADA EN ROLES
+// ====================================================================
+// 🔒 FUNCIÓN DE VALIDACIÓN PERIMETRAL CENTRALIZADA Y SEGURA (AUTH.JS)
+// ====================================================================
 function verificarAccesoPantalla() {
+    const cashierId = sessionStorage.getItem('pos_cashier');
     const usuarioSesionActiva = JSON.parse(sessionStorage.getItem('pos_user'));
+    
+    // Obtenemos el nombre del archivo actual limpio (ej: "catalog.html")
     const paginaActual = window.location.pathname.split('/').pop() || 'ventas.html';
 
+    // Si está en el POS principal de cobro, el acceso siempre es libre
     if (paginaActual === 'ventas.html' || paginaActual === '') return;
 
-    if (!usuarioSesionActiva) {
+    // Si intentan entrar por URL sin haber iniciado sesión, expulsión inmediata
+    if (!cashierId || !usuarioSesionActiva) {
         window.location.href = 'ventas.html'; 
         return;
     }
 
-    const rolActual = (usuarioSesionActiva.role || usuarioSesionActiva.rol || '').toLowerCase();
+    // 🎯 EL CONTROL DE LA VERDAD: Consultamos el disco duro en tiempo real para evitar caché vieja
+    const listaUsuariosDB = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    const usuarioVigente = listaUsuariosDB.find(x => (x.user || x.usuario) === cashierId);
 
-    // 👑 EL ROL MANDA: Solo se permite la administración si el rol es 'admin' o 'master'
-    const esAutorizado = rolActual === 'admin' || rolActual === 'master';
-
-    if (!esAutorizado) {
-        alert("Acceso denegado.");
+    // Si el usuario fue eliminado de la base de datos mientras operaba, lo echamos
+    if (!usuarioVigente) {
+        sessionStorage.clear();
         window.location.href = 'ventas.html';
         return;
     }
 
-    // Validación granular para administradores seccionales limitados
-    if (rolActual === 'admin') {
-        const p = usuarioSesionActiva.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {} };
-        if (paginaActual.includes('catalog.html') && !p.catalogo?.ver) { alert("Acceso denegado."); window.location.href = 'ventas.html'; }
-        if (paginaActual.includes('users.html') && !p.usuarios?.ver) { alert("Acceso denegado."); window.location.href = 'ventas.html'; }
-        if (paginaActual.includes('estaciones.html') && !p.estaciones?.ver) { alert("Acceso denegado."); window.location.href = 'ventas.html'; }
+    const rolActual = String(usuarioVigente.role || usuarioVigente.rol || '').toLowerCase();
+    const aliasLogueado = String(cashierId).toLowerCase();
+
+    // 👑 INMUNIDAD MASTER GENERAL: El dueño (master, sup, admin) tiene pase libre a todo por diseño
+    const esMaestro = rolActual === 'master' || aliasLogueado === 'sup' || aliasLogueado === 'admin';
+    if (esMaestro) return; 
+
+    // ====================================================================
+    // 🔒 EVALUACIÓN DE PRIVILEGIOS GRANULARES PARA ADMINISTRADORES / CAJEROS
+    // ====================================================================
+    const p = usuarioVigente.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {}, inventarios: {} };
+    let tieneAcceso = true;
+    let nombreSeccionEstetica = "";
+
+    // Candado A: Catálogo
+    if (paginaActual.includes('catalog.html')) {
+        tieneAcceso = p.catalogo?.ver === true;
+        nombreSeccionEstetica = "Catálogo";
+    }
+    // Candado B: Usuarios / Personal
+    else if (paginaActual.includes('users.html')) {
+        tieneAcceso = p.usuarios?.ver === true;
+        nombreSeccionEstetica = "Personal / Usuarios";
+    }
+    // Candado C: Estaciones de Trabajo
+    else if (paginaActual.includes('estaciones.html')) {
+        tieneAcceso = p.estaciones?.ver === true;
+        nombreSeccionEstetica = "Estaciones";
+    }
+    // Candado D: 🔥 NUEVO BLINDAJE PARA EL PANEL DE REPORTES
+    else if (paginaActual.includes('reportes.html')) {
+        tieneAcceso = p.reportes?.ver === true;
+        nombreSeccionEstetica = "Reportes";
+    }
+    // Candado E: 🔥 NUEVO BLINDAJE PARA EL PANEL DE INVENTARIOS MASIVOS
+    else if (paginaActual.includes('inventarios.html')) {
+        tieneAcceso = p.inventarios?.ver === true;
+        nombreSeccionEstetica = "Inventarios";
+    }
+
+    // ❌ INTERCEPCIÓN OPERATIVA RIGUROSA
+    if (!tieneAcceso) {
+        alert(`❌ ACCESO RESTRINGIDO:\nEl usuario "${usuarioVigente.user}" no cuenta con los permisos requeridos para visualizar la sección de ${nombreSeccionEstetica}.`);
+        window.location.href = 'ventas.html'; // Lo expulsa de inmediato al POS de forma limpia
     }
 }
+
+// Aseguramos el arranque automático en el ciclo de carga de auth.js
+if (typeof window !== 'undefined') {
+    verificarAccesoPantalla();
+}
+
 
  function  applyPermissions(user){
     if(!user)  return;
@@ -111,36 +164,47 @@ function verificarAccesoPantalla() {
     });
  }
 
+// ========================================================
+// LOGOUT
+// ========================================================
+function logout() {
+   // 1. Limpia datos en memoria
+   currentUser = null;
 
-// LOGOUT function
-function  logout()  {
-   //  Limpia  datos  en  memoria
-   currentUser  =  null;
-
-    //  Limpia sessionStorage
-    sessionStorage.removeItem('pos_user');
+   // 2. Limpia sessionStorage de forma masiva para evitar fugas de datos
+   sessionStorage.removeItem('pos_user');
    sessionStorage.removeItem('pos_cashier');
-    sessionStorage.removeItem('estacion-activa');
+   sessionStorage.removeItem('estacion-activa');
    sessionStorage.removeItem('lastCutISO');
+   sessionStorage.removeItem('pos_ticket_seq'); // Limpieza de folios
+   sessionStorage.clear(); // Garantiza la purga absoluta
 
-   //  Limpia  campos  del login
-    document.getElementById('login-user').value  = "";
-    document.getElementById('login-pass').value  = "";
-    document.getElementById('login-station').value  = "Principal";
-    if  (document.getElementById('login-turno')) {
-       document.getElementById('login-turno').selectedIndex  =  0;
+   // 3. Limpia campos del login
+   if (document.getElementById('login-user')) document.getElementById('login-user').value = "";
+   if (document.getElementById('login-pass')) document.getElementById('login-pass').value = "";
+   
+   // 🔥 CORRECCIÓN DE LA SUCURSAL POR DEFAULT:
+   // Al salir, forzamos que el selector apunte de forma automatizada a "Salto del Agua"
+   const selectEstacion = document.getElementById('login-station');
+   if (selectEstacion) {
+       selectEstacion.value = "Salto del Agua";
+   }
+   
+   if (document.getElementById('login-turno')) {
+       document.getElementById('login-turno').selectedIndex = 0;
    }
 
-    // Opcional:  limpia  spans  del  header
-   if  (el.cashierSpan)  el.cashierSpan.textContent =  "Usuario:  —";
-   if  (el.stationSpan)  el.stationSpan.textContent  =  "Estación: —";
-    if  (el.turnoSpan) el.turnoSpan.textContent  =  "Turno:  —";
-   if  (el.ticketNum)  el.ticketNum.textContent  = "Ticket:  #000000";
+   // 4. Limpia spans del header
+   if (el.cashierSpan) el.cashierSpan.textContent = "Usuario: —";
+   if (el.stationSpan) el.stationSpan.textContent = "Estación: —";
+   if (el.turnoSpan) el.turnoSpan.textContent  = "Turno:  —";
+   if (el.ticketNum) el.ticketNum.textContent  = "Ticket:  #000000";
 
-   //  Redirige  al  login
-   showLoginScreen();
+   // 5. Redirige visualmente a la pantalla de acceso
+   if (typeof showLoginScreen === "function") showLoginScreen();
+
+   window.location.reload();
 }
-
 
 document.getElementById('btn-logout')?.addEventListener('click', ()=> {
   document.getElementById('modal-logout').classList.remove('hidden')
