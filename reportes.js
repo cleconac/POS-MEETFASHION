@@ -15,38 +15,56 @@ let  datosFiltrados  =  [];  // ←  guarda  el  resultado  para  exportar
 // 1. Obtención segura del usuario activo en la terminal
 const activeReportUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
 
-// 2. FUNCIÓN DE CANDADOS DE AUDITORÍA PARA LA SECCIÓN DE REPORTES
-function aplicarCandadosSeccionReportes() {
-    if (!activeReportUserSession) return;
+// ====================================================================
+// 🔒 CONTROL PERIMETRAL Y CANDADOS DE AUDITORÍA PARA REPORTES (TICKETS FIX)
+// ====================================================================
 
-    const rolLogueado = (activeReportUserSession.role || activeReportUserSession.rol || '').toLowerCase();
-    const aliasLogueado = (activeReportUserSession.user || activeReportUserSession.usuario || '').toLowerCase();
+function aplicarCandadosSeccionReportes() {
+    // 1. Extraemos el alias de la cajera en sesión actual
+    const cashierId = sessionStorage.getItem('pos_cashier');
+    const activeReportUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
     
-    // 👑 INMUNIDAD MASTER: El dueño general hereda acceso automático total por diseño
+    if (!cashierId || !activeReportUserSession) {
+        window.location.replace('ventas.html');
+        return;
+    }
+
+    // 2. 🔥 CONSULTA CRÍTICA AL DISCO DURO: Buscamos los permisos vigentes reales
+    const listaUsuariosDB = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    const usuarioVigente = listaUsuariosDB.find(x => (x.user || x.usuario) === cashierId);
+
+    const rolLogueado = String(usuarioVigente ? (usuarioVigente.role || usuarioVigente.rol) : (activeReportUserSession.role || activeReportUserSession.rol || '')).toLowerCase();
+    const aliasLogueado = String(cashierId).toLowerCase();
+    
+    // 👑 INMUNIDAD MASTER: El dueño general hereda acceso automático
     const esMaestro = rolLogueado === 'master' || aliasLogueado === 'sup' || aliasLogueado === 'admin';
 
-    // Recuperamos las variables booleanas de tu LocalStorage
-    const p = esMaestro ? { ventas: true, cortes: true, exportar: true } : (activeReportUserSession.permisos?.reportes || {});
+    // Recuperamos las variables del objeto de permisos fresco del disco
+    const p = esMaestro ? { ver: true, ventas: true, cortes: true, tickets: true, exportar: true } : (usuarioVigente?.permisos?.reportes || {});
 
-    // Localizamos tus elementos utilizando tus IDs reales compartidos
+    // Localizamos tus elementos utilizando tus IDs reales
     const optVentas    = document.getElementById('opt-perm-ventas');
     const optCortes    = document.getElementById('opt-perm-cortes');
+    const optTickets   = document.getElementById('opt-perm-tickets'); // 🎯 TU NUEVO ID DE TICKETS
     const btnExportar  = document.getElementById('btn-exportar');
     const selectReport = document.getElementById('tipo-reporte');
 
     // --- CANDADO 1: PERMISO PARA VER VENTAS ---
     if (optVentas && !esMaestro && !p.ventas) {
-        optVentas.remove(); // Removemos la opción para que el empleado no la pueda seleccionar
+        optVentas.remove(); 
     }
 
     // --- CANDADO 2: PERMISO PARA VER CORTES ---
     if (optCortes && !esMaestro && !p.cortes) {
-        optCortes.remove(); // Removemos la opción para blindar la caja
+        optCortes.remove(); 
+    }
+
+    // --- 🎯 CANDADO 3: PERMISO PARA REIMPRESIÓN / TICKETS ---
+    if (optTickets && !esMaestro && !p.tickets) {
+        optTickets.remove(); // Remueve la opción si está apagada en el árbol
     }
 
     // PROTECCIÓN DE INTERFAZ VACÍA:
-    // Si a un administrador limitado le bloquearon tanto Ventas como Cortes, el select se quedaría en blanco.
-    // Le inyectamos una opción deshabilitada de aviso administrativo por seguridad.
     if (selectReport && selectReport.options.length === 0) {
         const optVacio = document.createElement("option");
         optVacio.textContent = "Módulo Restringido";
@@ -54,23 +72,21 @@ function aplicarCandadosSeccionReportes() {
         optVacio.selected = true;
         selectReport.appendChild(optVacio);
         
-        // Deshabilitamos el botón de buscar nativo para que no intente procesar consultas vacías
         const btnBuscar = document.getElementById('btn-buscar');
         if (btnBuscar) btnBuscar.disabled = true;
     }
 
-    // --- CANDADO 3: PERMISO PARA EXPORTAR CSV ---
+    // --- CANDADO 4: PERMISO PARA EXPORTAR CSV ---
     if (btnExportar) {
-        // Si no tiene la casilla marcada en el árbol, el botón "Exportar CSV" desaparece por completo
         btnExportar.style.display = (esMaestro || p.exportar) ? '' : 'none';
     }
 }
 
 // 3. ENLAZAR ARRANQUE AUTOMÁTICO EN EL DOM
 document.addEventListener("DOMContentLoaded", () => {
-    // El sistema primero valida el acceso general (auth.js) y luego recorta las opciones de este módulo
     aplicarCandadosSeccionReportes();
 });
+
 
 
 buscarBtn.addEventListener("click", buscarPorFechas);
@@ -101,33 +117,63 @@ function  toggleDetalle(id)  {
     return  [fecha,  hora];
  }
 
-
-function  buscarPorFechas()  {
-   if  (!fechaDesde.value  || !fechaHasta.value)  {
-       alert("Selecciona  ambas  fechas");
+// ====================================================================
+// BUSCADOR
+// ====================================================================
+function buscarPorFechas() {
+   if (!fechaDesde.value || !fechaHasta.value) {
+       alert("Selecciona ambas fechas");
        return;
    }
 
-   const  ini  =  new  Date(fechaDesde.value +  "T00:00:00");
-    const fin  =  new  Date(fechaHasta.value  + "T23:59:59");
-    const  tipo =  tipoReporte.value;
+   const ini = new Date(fechaDesde.value + "T00:00:00");
+   const fin = new Date(fechaHasta.value + "T23:59:59");
+   const tipo = tipoReporte.value;
 
-   if  (tipo  ===  "ventas")  {
-       const ventas  =  DB.getSales();
-       datosFiltrados  =  ventas.filter(v =>  {
-           const  f =  new  Date(v.fecha);
-           return f.getTime()  >=  ini.getTime()  &&  f.getTime() <=  fin.getTime();
+   // Cerramos cualquier panel de detalle derecho abierto por seguridad al hacer nueva búsqueda
+   if (typeof cerrarDetalle === "function") cerrarDetalle();
+
+   // ====================================================================
+   // 🔥 CONTROL REQUERIDO: Ocultar o mostrar el botón AL PRESIONAR BUSCAR
+   // ====================================================================
+   const btnExportarGlobal = document.getElementById('btn-exportar');
+   if (btnExportarGlobal) {
+       if (tipo === "tickets") {
+           // Si se procesa la búsqueda de Tickets, se remueve el botón del flujo visual
+           btnExportarGlobal.style.display = 'none';
+       } else {
+           // Si se procesan Cortes o Ventas tradicionales, se garantiza su visibilidad
+           btnExportarGlobal.style.display = '';
+       }
+   }
+
+   if (tipo === "ventas") {
+       const ventas = DB.getSales();
+       datosFiltrados = ventas.filter(v => {
+           const f = new Date(v.fecha);
+           return f.getTime() >= ini.getTime() && f.getTime() <= fin.getTime();
        });
-       renderVentas(datosFiltrados,  listaFechas);
-   }  else  {
-       const  cortes  = DB.getCuts();
-       datosFiltrados  =  cortes.filter(c  =>  {
-          const  f  =  new Date(c.fecha);
-           return  f.getTime()  >= ini.getTime()  &&  f.getTime()  <=  fin.getTime();
+       renderVentas(datosFiltrados, listaFechas);
+       
+   } else if (tipo === "tickets") {
+       const ventas = DB.getSales();
+       datosFiltrados = ventas.filter(v => {
+           const f = new Date(v.fecha);
+           return f.getTime() >= ini.getTime() && f.getTime() <= fin.getTime();
+       });
+       renderTickets(datosFiltrados, listaFechas);
+       
+   } else {
+       const cortes = DB.getCuts();
+       datosFiltrados = cortes.filter(c => {
+          const f = new Date(c.fecha);
+           return f.getTime() >= ini.getTime() && f.getTime() <= fin.getTime();
        });
        renderCortes(datosFiltrados, listaFechas);
     }
 }
+
+
 
 
 /* ========================================================
@@ -165,7 +211,8 @@ function  buscarPorFechas()  {
      });
 
      html +=  `</table>`;
-    destino.innerHTML  =  html;}
+    destino.innerHTML  =  html;
+}
 
 
 /* ========================================================
@@ -238,130 +285,368 @@ function  buscarPorFechas()  {
     if  (firstRow)  firstRow.focus();
  }
 
-/* ========================================================
-   RENDER PARA LA BUSQUEDA DE TICKETS VENDIDOS
-   ======================================================== */
-function renderTickets(arr, destino) {
+
+// ========================================================
+// RELLENAR EL PANEL LATERAL DE CORTES
+// ========================================================
+function mostrarDetalle(c, elementoFila) { // <-- Usa tus variables nativas del archivo original
+    // 1. Mantén tu lógica original para prender y apagar el color azul de la fila clickeada:
+    document.querySelectorAll('.corte-row').forEach(tr => tr.classList.remove('fila-seleccionada'));
+    if (elementoFila) elementoFila.classList.add('fila-seleccionada');
+
+    const panelTitulo = document.getElementById('detalle-fecha');
+    const panelContenido = document.getElementById('detalle-contenido');
+
+    if (panelTitulo && panelContenido) {
+        const [fechaMX, horaMX] = mxFechaHora(c.fecha);
+        
+        // Sincronizamos el título fijo del panel
+        panelTitulo.innerHTML = `📊 Corte del ${fechaMX} - ${horaMX}`;
+
+        // Mapeamos los artículos vendidos de forma idéntica
+        const articulos = c.articulos && typeof c.articulos === "object" ? Object.values(c.articulos) : [];
+        let listaProductosHtml = "";
+        
+        articulos.forEach(a => {
+            const nombre = a?.nombre ?? "—";
+            const qty = Number(a?.qty || 0);
+            const monto = Number(a?.monto || 0);
+            listaProductosHtml += `<li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;">• <strong>${nombre}</strong> — ${qty} pzas — <span style="font-weight:600;">$${monto.toFixed(2)}</span></li>`;
+        });
+
+// BUSCA TU FUNCIÓN mostrarDetalle Y ACTUALIZA EL BLOQUE DE CÁLCULO ASÍ:
+
+        // 🔍 MÓDULO MATEMÁTICO MULTICANAL DE ALTA PRECISIÓN (Consola Sincronizada)
+        const brutoEfectivo   = Number(c.totalCash || 0);
+        const netoTarjeta      = Number(c.totalCard || 0);
+        const netoTransfer     = Number(c.totalTransfer || 0);
+        const ingresosTotales  = Number(c.totalIngresos || 0);
+        
+        // 🔥 FÓRMULA SUPREMA DE DESCARTE MULTICANAL AL VUELO:
+        // Sumamos todo el dinero bruto que ingresó al sistema y le restamos lo que costó la nota real.
+        // El excedente es, por ley matemática, el cambio entregado.
+        let cambioEntregadoTotal = (brutoEfectivo + netoTarjeta + netoTransfer) - ingresosTotales;
+        
+        // Candado preventivo por si el cambio da un número negativo por micro-redondeos
+        if (cambioEntregadoTotal < 0) cambioEntregadoTotal = 0;
+
+        // 🎯 EL CASH NETO REAL: El efectivo físico real limpio que se queda en el cajón de monedas
+        const efectivoNetoRealCaja = brutoEfectivo - cambioEntregadoTotal;
+
+        // RE-ESTRUCTURACIÓN COMPLETA UNIFICADA CON LA FILA DE CAMBIO MULTICANAL
+        panelContenido.innerHTML = `
+            <div class="ticket-info-wrapper">
+                <div style="background:#f8fafc; padding:10px; border-radius:6px; margin-bottom:15px; font-size:12px; border:1px solid #e2e8f0; line-height:1.6;">
+                    <p style="margin:4px 0;"><strong>Usuario Responsable:</strong> ${c.usuario || '—'}</p>
+                    <p style="margin:4px 0;"><strong>Estación de Caja:</strong> ${c.estacion}</p>
+                    <p style="margin:4px 0;"><strong>Tickets Emitidos:</strong> ${Number(c.tickets || 0)} transacciones</p>
+                    <hr style="border:none; border-top:1px dashed #cbd5e1; margin:8px 0;">
+                    
+                    <!-- 💵 EFECTIVO NETO: Dinero real en monedas tras restar el cambio deducido -->
+                    <p style="margin:4px 0; color:#475569;">💵 Efectivo Neto en Caja: <strong>$${efectivoNetoRealCaja.toFixed(2)}</strong></p>
+                    
+                    <!-- ↩️ CAMBIO ENTREGADO: Deducción multicanal exacta -->
+                    <p style="margin:4px 0; color:#ef4444;">↩️ Cambio Entregado: -$${cambioEntregadoTotal.toFixed(2)}</p>
+                    
+                    <p style="margin:4px 0; color:#475569;">💳 Terminal Tarjeta: $${netoTarjeta.toFixed(2)}</p>
+                    <p style="margin:4px 0; color:#475569;">📲 Transferencias: $${netoTransfer.toFixed(2)}</p>
+                </div>
+                
+                <p style="font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:13px;">Resumen de Artículos Vendidos:</p>
+                
+                <div class="corte-products-scroll">
+                    <ul style="padding-left: 5px; margin: 0; list-style: none;">
+                        ${listaProductosHtml || '<li style="color:#888;">Sin artículos vendidos en este turno.</li>'}
+                    </ul>
+                </div>
+                
+                <div class="corte-total-sticky">
+                    <span style="font-size:13px; color:#64748b;">Ingresos Totales del Corte:</span>
+                    <h3 style="margin:4px 0; color:#0066ff; font-size:22px; font-weight:bold;">$${ingresosTotales.toFixed(2)} MXN</h3>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('detalle-panel')?.classList.remove('hidden');
+    }
+}
+
+// ========================================================
+// RENDERIZADOR MAESTRO DE TICKETS (CONECTADO A PAYMENTS)
+// ========================================================
+function renderTickets(arrVentas, destino) {
     destino.innerHTML = "";
 
-    if (!arr || arr.length === 0) {
+    if (!arrVentas || arrVentas.length === 0) {
         destino.innerHTML = `<div class="empty">No hay tickets emitidos en ese rango de fechas.</div>`;
         return;
     }
 
     let html = `<table class="table">
-        <tr>
-            <th>Fecha</th>
-            <th>Hora</th>
-            <th>Folio / Ticket</th>
-            <th>Usuario</th>
-            <th>Estación</th>
-            <th>Método Pago</th>
-            <th>Total Vendido</th>
-        </tr>`;
+        <thead>
+            <tr>
+                <th>Fecha / Hora</th>
+                <th>Folio Ticket</th>
+                <th>Cajera / Usuario</th>
+                <th>Estación</th>
+                <th>Método Pago</th>
+                <th>Artículos</th>
+                <th>Total Cobrado</th>
+            </tr>
+        </thead>
+        <tbody>`;
 
-    arr.forEach((t, i) => {
-        // Aprovechamos tus mismas funciones de conversión de fecha
-        const [fechaMX, horaMX] = mxFechaHora ? mxFechaHora(t.fecha) : [t.fecha, '—'];
+    arrVentas.forEach((t, i) => {
+        const [fechaMX, horaMX] = mxFechaHora(t.fecha || new Date());
         
-        // Mapeamos los artículos vendidos en este ticket específico para construir su desglose lateral/flotante
-        const articulos = t.articulos && typeof t.articulos === "object" 
-            ? Object.values(t.articulos) 
-            : (t.articulos || []);
+        let listaPrendas = t.items || t.articulos || [];
+        if (typeof listaPrendas === "object" && !Array.isArray(listaPrendas)) {
+            listaPrendas = Object.values(listaPrendas);
+        }
 
-        const detalleHTML = articulos.length
-            ? `<ul style="margin:0;padding-left:20px;">
-                  ${articulos.map(a => {
-                      const nombre = a?.nombre ?? "—";
-                      const qty = Number(a?.qty || a?.cantidad || 0);
-                      const monto = Number(a?.monto || a?.precio || 0) * qty;
-                      return `<li>${nombre} — ${qty} pzas — $${monto.toFixed(2)}</li>`;
-                  }).join("")}
-                </ul>`
-            : `<div style="color:#666">Sin productos registrados en este ticket</div>`;
+        const totalPiezas = listaPrendas.reduce((sum, a) => {
+            const c = typeof a.cantidad !== 'undefined' ? a.cantidad : (a.qty || 1);
+            return sum + Number(c);
+        }, 0);
 
-        // 🔥 CLAVE: Usamos la clase 'corte-row' para heredar la mano y los estilos de selección.
-        // Pasamos el objeto del ticket y 'this' a la misma función mostrarDetalle()
+        const totalDinero = Number(t.total || t.monto || 0);
+        const usuarioResponsable = t.usuario || t.cashier || t.vendedor || 'Wendy';
+        // 🔍 EXTRACTOR DE ESTACIÓN HISTÓRICA REAL (TABLA)
+        // 1. Buscamos primero si el ticket guardó la estación de forma nativa en sus propiedades
+        let estacionDetectada = t.estacion || t.station || t.caja || t.stationSeleccionada || '';
+
+        // 2. Si el ticket no la tiene (ventas de contingencia), buscamos qué estación tiene asignada 
+        // ese empleado específico en la base de datos de usuarios para mantener la coherencia
+        if (!estacionDetectada || estacionDetectada.trim() === "") {
+            const listaUsuariosDB = DB.getUsers ? DB.getUsers() : [];
+            const empleadoQueAtendio = listaUsuariosDB.find(x => x.user === usuarioResponsable);
+            estacionDetectada = empleadoQueAtendio ? (empleadoQueAtendio.estacion || empleadoQueAtendio.station) : 'Salto del Agua';
+        }
+
+        const estacionVenta = estacionDetectada;
+
+        // ====================================================================
+        // 🔥 CORRECCIÓN CRÍTICA DE VARIABLE: Inicialización segura de marcas de pago
+        // ====================================================================
+        let metodosDetectados = [];
+        const pObj = t.payments || t.pagos;
+        
+        if (pObj && typeof pObj === 'object') {
+            const efec = parseFloat(pObj.efectivo || 0);
+            const tarj = parseFloat(pObj.tarjeta || 0);
+            const transf = parseFloat(pObj.transferencia || 0);
+
+            if (efec > 0) metodosDetectados.push('EFECTIVO');
+            if (tarj > 0) metodosDetectados.push('TARJETA');
+            if (transf > 0) metodosDetectados.push('TRANSFERENCIA');
+        }
+
+        // Si no venía en el subobjeto payments, buscamos un string directo de respaldo
+        if (metodosDetectados.length === 0) {
+            const directo = String(t.metodo_pago || t.payment_method || t.tipo_pago || t.pago || 'EFECTIVO').toUpperCase();
+            if (directo.includes('TARJETA')) metodosDetectados.push('TARJETA');
+            else if (directo.includes('TRANSFERENCIA')) metodosDetectados.push('TRANSFERENCIA');
+            else metodosDetectados.push('EFECTIVO');
+        }
+
+        // Limpiamos duplicados de forma segura antes de evaluar el HTML
+        metodosDetectados = [...new Set(metodosDetectados)];
+        
+        // --- 🎨 RENDERIZADO SEGURO DE ICONOS ---
+        let formaPagoHtml = '';
+        const metodoUnico = metodosDetectados.length === 1 ? metodosDetectados[0] : 'MIXTO';
+
+        if (metodoUnico === 'TARJETA') {
+            formaPagoHtml = `<span class="audit-user" style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight:600;">💳 TARJETA</span>`;
+        } else if (metodoUnico === 'TRANSFERENCIA') {
+            formaPagoHtml = `<span class="audit-user" style="background: #f0fdf4; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight:600;">📲 TRANSFERENCIA</span>`;
+        } else if (metodoUnico === 'MIXTO') {
+            formaPagoHtml = `<span class="audit-user" style="background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight:600;">🔀 MIXTO</span>`;
+        } else {
+            formaPagoHtml = `<span class="audit-user" style="background: #f1f5f9; color: #334155; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight:600;">💵 EFECTIVO</span>`;
+        }
+
+        const folioTicket = t.ticket || t.id || `TK-${1000 + i}`;
+
+        // Inyección limpia y libre de errores en la tabla
         html += `
             <tr class="corte-row" tabindex="0" onclick="mostrarDetalleTicket(${JSON.stringify(t).replace(/"/g, '&quot;')}, this)">
-                <td>${fechaMX}</td>
-                <td>${horaMX}</td>
-                <td><strong>#${t.id || t.ticket_id || i + 1}</strong></td>
-                <td>${t.usuario || "—"}</td>
-                <td>${t.estacion || t.station || "—"}</td>
-                <td>${(t.metodo_pago || t.payment_method || 'Efectivo').toUpperCase()}</td>
-                <td><strong>$${Number(t.total || t.monto || 0).toFixed(2)}</strong></td>
-            </tr>
-            <tr id="detalle-ticket-row-${i}" class="hidden">
-                <td colspan="7">${detalleHTML}</td>
+                <td><span style="font-size: 12px; color: #555;">${fechaMX} - ${horaMX}</span></td>
+                <td><strong>#${folioTicket}</strong></td>
+                <td>${usuarioResponsable}</td>
+                <td>${estacionVenta}</td>
+                <td>${formaPagoHtml}</td>
+                <td>${totalPiezas} pzas</td>
+                <td><strong>$${totalDinero.toFixed(2)}</strong></td>
             </tr>`;
     });
 
-    html += `</table>`;
+
+    html += `</tbody></table>`;
     destino.innerHTML = html;
 
     const firstRow = destino.querySelector(".corte-row");
     if (firstRow) firstRow.focus();
 }
 
-/* ========================================================
-   RENDER PARA MOSTRAR EL DETALLE DE TICKETS VENDIDOS
-   ======================================================== */
+// ========================================================
+// RELLENAR EL PANEL LATERAL PARA TICKETS
+// ========================================================
 function mostrarDetalleTicket(objetoTicket, elementoFila) {
-    // 1. Apagar el color azul en cualquier otra fila que haya estado seleccionada antes
     document.querySelectorAll('.corte-row').forEach(tr => {
         tr.classList.remove('fila-seleccionada');
     });
     
-    // 2. Encender el color azul únicamente en el ticket seleccionado
     if (elementoFila) {
         elementoFila.classList.add('fila-seleccionada');
     }
 
-    // 3. Poblar el lateral derecho o la modal de desglose (Adaptado a tus IDs de panel)
-    const panelTitulo = document.getElementById('detalle-fecha'); // ID de tu cabecera lateral
-    const panelContenido = document.getElementById('detalle-contenido'); // ID de tu cuerpo lateral
+    const panelTitulo = document.getElementById('detalle-fecha');
+    const panelContenido = document.getElementById('detalle-contenido');
 
     if (panelTitulo && panelContenido) {
-        const [fechaMX, horaMX] = mxFechaHora ? mxFechaHora(objetoTicket.fecha) : [objetoTicket.fecha, ''];
+        const [fechaMX, horaMX] = mxFechaHora(objetoTicket.fecha || new Date());
+        const folio = objetoTicket.ticket || objetoTicket.id || 'Venta';
         
-        panelTitulo.textContent = `Ticket #${objetoTicket.id || 'Venta'} - ${fechaMX}`;
+        panelTitulo.innerHTML = `🧾 Ticket #<span style="color:#0066ff">${folio}</span>`;
 
-        const articulos = objetoTicket.articulos && typeof objetoTicket.articulos === "object" 
-            ? Object.values(objetoTicket.articulos) 
-            : (objetoTicket.articulos || []);
+        let articlesList = objetoTicket.items || objetoTicket.articulos || [];
+        if (typeof articlesList === "object" && !Array.isArray(articlesList)) {
+            articlesList = Object.values(articlesList);
+        }
 
-        let listaArticulosHtml = "";
-        articulos.forEach(a => {
-            const nombre = a?.nombre ?? "—";
-            const qty = Number(a?.qty || a?.cantidad || 0);
-            const precioUnitario = Number(a?.precio || 0);
+        const usuarioResponsable = objetoTicket.usuario || objetoTicket.cashier || objetoTicket.vendedor || 'Wendy';
+        // 🔍 EXTRACTOR DE ESTACIÓN HISTÓRICA REAL (PANEL LATERAL)
+        let estacionLateralDetectada = objetoTicket.estacion || objetoTicket.station || objetoTicket.caja || objetoTicket.stationSeleccionada || '';
+
+        if (!estacionLateralDetectada || estacionLateralDetectada.trim() === "") {
+            const listaUsuariosDB = DB.getUsers ? DB.getUsers() : [];
+            const empleadoQueAtendio = listaUsuariosDB.find(x => x.user === usuarioResponsable);
+            estacionLateralDetectada = empleadoQueAtendio ? (empleadoQueAtendio.estacion || empleadoQueAtendio.station) : 'Salto del Agua';
+        }
+
+        const estacionVenta = estacionLateralDetectada;
+
+        const granTotal = Number(objetoTicket.total || objetoTicket.monto || 0);
+
+        // BUSCA ESTA SECCIÓN EN TU FUNCIÓN mostrarDetalleTicket Y REEMPLÁZALA:
+
+        // 🔍 MÓDULO MATEMÁTICO DE AUDITORÍA DE CAMBIO POR TICKET
+        let formaPagoHtmlLateral = '💵 EFECTIVO';
+        let efectivoRecibido = granTotal; 
+        let cambioEntregado = 0;
+        let esPagoConEfectivo = false; // 🔥 Bandera para saber si inyectar las filas de auditoría
+
+        const pObj = objetoTicket.payments || objetoTicket.pagos;
+        
+        if (pObj && typeof pObj === 'object') {
+            const efec = parseFloat(pObj.efectivo || 0);
+            const tarj = parseFloat(pObj.tarjeta || 0);
+            const transf = parseFloat(pObj.transferencia || 0);
+
+            if (efec > 0) esPagoConEfectivo = true; // Si hay monedas involucradas, se activa el bloque
+            efectivoRecibido = efec; 
+
+            let canalesActivos = 0;
+            if (efec > 0) canalesActivos++;
+            if (tarj > 0) canalesActivos++;
+            if (transf > 0) canalesActivos++;
+
+            if (canalesActivos > 1) {
+                formaPagoHtmlLateral = `<span style="color: #92400e; font-weight: 600;">🔀 MIXTO</span> <br> <span style="font-size: 11px; color: #64748b;">(💵 $${efec.toFixed(2)} / 💳 $${tarj.toFixed(2)} / 📲 $${transf.toFixed(2)})</span>`;
+                
+                const saldoEfectivoEsperado = granTotal - tarj - transf;
+                if (efec > saldoEfectivoEsperado) {
+                    cambioEntregado = efec - saldoEfectivoEsperado;
+                }
+            } else if (tarj > 0) {
+                formaPagoHtmlLateral = `💳 TARJETA`;
+                efectivoRecibido = 0;
+                cambioEntregado = 0;
+            } else if (transf > 0) {
+                formaPagoHtmlLateral = `📲 TRANSFERENCIA`;
+                efectivoRecibido = 0;
+                cambioEntregado = 0;
+            } else {
+                formaPagoHtmlLateral = `💵 EFECTIVO`;
+                if (efec >= granTotal) {
+                    cambioEntregado = efec - granTotal;
+                }
+            }
+        } else {
+            const directo = String(objetoTicket.metodo_pago || objetoTicket.payment_method || 'EFECTIVO').toUpperCase();
+            if (directo.includes('TARJETA')) formaPagoHtmlLateral = `💳 TARJETA`;
+            else if (directo.includes('TRANSFERENCIA')) formaPagoHtmlLateral = `📲 TRANSFERENCIA`;
+            else esPagoConEfectivo = true; // Por defecto si es viejo e indexó efectivo
+        }
+
+        // 🔥 MODIFICACIÓN DE UX: Si hubo uso de efectivo (monto mayor o igual a cero), inyectamos las etiquetas permanentemente
+        let desgloseEfectivoHtml = '';
+        if (esPagoConEfectivo) {
+            desgloseEfectivoHtml = `
+                <p style="margin:4px 0; color:#475569;">📥 Efectivo Recibido: $${efectivoRecibido.toFixed(2)}</p>
+                <!-- Si es exacto, pintará de forma limpia y transparente -$0.00 -->
+                <p style="margin:4px 0; color:${cambioEntregado > 0 ? '#ef4444' : '#64748b'};">↩️ Cambio Entregado: -$${cambioEntregado.toFixed(2)}</p>
+            `;
+        }
+
+
+        // 🔥 DECLARACIÓN UNIFICADA DE LA VARIABLE DE PRODUCTOS
+        let tablaProductosHtml = `
+            <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left; margin-top:10px;">
+                <thead style="background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+                    <tr>
+                        <th style="padding:6px;">Prenda / Artículo</th>
+                        <th style="padding:6px; text-align:center;">Cant</th>
+                        <th style="padding:6px; text-align:right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        articlesList.forEach(a => {
+            const nombre = a.nombre || a.articulo || 'Artículo sin nombre';
+            const qty = Number(typeof a.cantidad !== 'undefined' ? a.cantidad : (a.qty || 1));
+            const precioUnitario = Number(a.precio || 0);
             const subtotal = qty * precioUnitario;
-            listaArticulosHtml += `<li>• ${nombre} ($${precioUnitario.toFixed(2)}) — ${qty} pzas — $${subtotal.toFixed(2)}</li>`;
+
+            tablaProductosHtml += `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:8px;">${nombre} <br><span style="font-size:11px; color:#64748b;">P. Unit: $${precioUnitario.toFixed(2)}</span></td>
+                    <td style="padding:8px; text-align:center; font-weight:600;">${qty}</td>
+                    <td style="padding:8px; text-align:right; font-weight:600;">$${subtotal.toFixed(2)}</td>
+                </tr>`;
         });
 
-        // Inyectamos los datos generales de la venta en tu panel lateral derecho
+        tablaProductosHtml += `</tbody></table>`;
+
+        // 🔥 INYECCIÓN DE CONTENIDO: Sincronizado perfectamente con la variable en minúsculas 'tablaProductosHtml'
         panelContenido.innerHTML = `
-            <div style="font-size: 13px; line-height: 1.6; color: #333;">
-                <p><strong>Cajera/Usuario:</strong> ${objetoTicket.usuario || '—'}</p>
-                <p><strong>Estación de venta:</strong> ${objetoTicket.estacion || objetoTicket.station || 'Principal'}</p>
-                <p><strong>Hora de emisión:</strong> ${horaMX}</p>
-                <p><strong>Método de Pago:</strong> ${(objetoTicket.metodo_pago || 'Efectivo').toUpperCase()}</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 10px 0;">
-                <p><strong>Artículos vendidos:</strong></p>
-                <ul style="padding-left: 15px; margin: 0; list-style: none;">
-                    ${listaArticulosHtml}
-                </ul>
-                <hr style="border: none; border-top: 2px dashed #ccc; margin: 15px 0;">
-                <p style="font-size: 16px; color: #059669;"><strong>TOTAL TRANSACCIÓN: $${Number(objetoTicket.total || 0).toFixed(2)}</strong></p>
+            <div class="ticket-info-wrapper">
+                <div style="background:#f8fafc; padding:10px; border-radius:6px; margin-bottom:15px; font-size:12px; border:1px solid #e2e8f0; line-height: 1.6;">
+                    <p style="margin:4px 0;"><strong>Fecha y Hora:</strong> ${fechaMX} - ${horaMX}</p>
+                    <p style="margin:4px 0;"><strong>Atendió:</strong> ${usuarioResponsable}</p>
+                    <p style="margin:4px 0;"><strong>Estación:</strong> ${estacionVenta}</p>
+                    <p style="margin:4px 0;"><strong>Forma de Pago:</strong> ${formaPagoHtmlLateral}</p>
+                    <!-- 🔥 FILA DINÁMICA DE CAMBIO INYECTADA -->
+                    ${desgloseEfectivoHtml}
+                </div>
+                
+                <p style="font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:13px;">Prendas en la nota:</p>
+                
+                <div class="ticket-products-scroll">
+                    ${tablaProductosHtml}
+                </div>
+                
+                <div class="ticket-total-sticky">
+                    <span style="font-size:13px; color:#64748b;">Total de la Compra:</span>
+                    <h3 style="margin:4px 0; color:#059669; font-size:22px; font-weight:bold;">$${granTotal.toFixed(2)} MXN</h3>
+                </div>
             </div>
         `;
 
-        // Removemos la clase hidden de tu panel lateral derecho para que se despliegue elegantemente
         document.getElementById('detalle-panel')?.classList.remove('hidden');
     }
 }
-
 
  function  exportCSV(filename,  rows){
      const  csv  =  rows.map(r =>  r.map(v  =>  `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
@@ -375,37 +660,53 @@ function mostrarDetalleTicket(objetoTicket, elementoFila) {
     const  tipo  =  tipoReporte.value;
      if  (datosFiltrados.length ===  0)  return  alert("No  hay  datos  para  exportar");
  
-if  (tipo  === "ventas")  {
-    const  rows  =  [["Ticket","Producto","Fecha","Hora","Total","Pagado","Cambio","Cash","Card","Transfer","Cashier"]];
+  if (tipo === "ventas") {
+    // 1. Añadimos "Estación" en las cabeceras del CSV justo antes de "Cashier"
+    const rows = [["Ticket", "Producto", "Fecha", "Hora", "Total", "Pagado", "Cambio", "Cash", "Card", "Transfer", "Estacion", "Cashier"]];
 
-    datosFiltrados.forEach(v  =>  {
-       const  [f,h]  =  v.fecha.split("T");
-       const  horaFmt  =  h.slice(0,8);
+    datosFiltrados.forEach(v => {
+       const [f, h] = v.fecha.split("T");
+       const horaFmt = h.slice(0, 8);
 
-       (v.items  ||  []).forEach(it  =>  {
-           rows.push([
-               v.ticket ||  String(v.id  ||  "").padStart(6,"0"),  //  Ticket  #
-               it.nombre ||  "",                                                          //  Producto
-               f,                                                                                     // Fecha
-               horaFmt,                                                                         //  Hora
-               v.total?.toFixed(2)  ||  "0.00",                                //  Total  venta
-              v.pagado?.toFixed(2)  ||  ((
-                   (v.payments?.efectivo||0)  +
-                  (v.payments?.tarjeta||0)  +
-                   (v.payments?.transferencia||0)
-               ).toFixed(2)),                                                              // Pagado
-               v.cambio?.toFixed(2)  ||  "0.00",                              //  Cambio
-               v.payments?.efectivo?.toFixed(2)  ||  "0.00",       //  Cash
-               v.payments?.tarjeta?.toFixed(2)  ||  "0.00",         //  Card
-               v.payments?.transferencia?.toFixed(2)  || "0.00",  //  Transfer
-               v.cashier  ||  ""                                                            //  Cajero
-           ]);
+       // 🔍 EXTRACTOR DE ESTACIÓN EN TIEMPO REAL
+       // Buscamos primero si el ticket guardó la estación de forma nativa en sus propiedades (.estacion o .station)
+       let estacionDetectada = v.estacion || v.station || v.caja || '';
+       
+       // Si el ticket no la tiene (ventas antiguas), buscamos qué estación tiene asignada ese usuario en la DB
+       if (!estacionDetectada || estacionDetectada.trim() === "") {
+           const listaUsuariosDB = DB.getUsers ? DB.getUsers() : [];
+           const nombreCajera = v.cashier || v.usuario || '';
+           const empleado = listaUsuariosDB.find(x => x.user === nombreCajera);
+           estacionDetectada = empleado ? (empleado.estacion || empleado.station) : 'Salto del Agua';
+       }
+
+       (v.items || []).forEach(it => {
+          rows.push([
+             v.ticket || String(v.id || "").padStart(6, "0"), // Ticket #
+             it.nombre || "",                                  // Producto
+             f,                                                // Fecha
+             horaFmt,                                          // Hora
+             v.total?.toFixed(2) || "0.00",                    // Total venta
+             v.pagado?.toFixed(2) || ((
+                (v.payments?.efectivo || 0) +
+                (v.payments?.tarjeta || 0) +
+                (v.payments?.transferencia || 0)
+             ).toFixed(2)),                                    // Pagado
+             v.cambio?.toFixed(2) || "0.00",                   // Cambio
+             v.payments?.efectivo?.toFixed(2) || "0.00",       // Cash
+             v.payments?.tarjeta?.toFixed(2) || "0.00",        // Card
+             v.payments?.transferencia?.toFixed(2) || "0.00",  // Transfer
+             
+             // 🔥 NUEVAS INYECCIONES DE COLUMNAS ALINEADAS CON EXCEL
+             estacionDetectada,                                // Estación
+             v.cashier || ""                                   // Cajero
+          ]);
        });
     });
 
-   exportCSV("ventas.csv",  rows);
+    exportCSV("ventas.csv", rows);
 
-    }  else  {
+  }  else  {
 //  Dentro  de  exportarBtn  handler, tipo  !==  "ventas"
 const  rows =  [["Fecha","Hora","Usuario","Estacion","Tickets","Efectivo","Tarjeta","Transferencia","Total","Turno"]];
 
@@ -457,46 +758,6 @@ function renderLista(arr, destino) {
 
     destino.innerHTML = html;
 }
-
-
- function  mostrarDetalle(corte, elementoFila) {
-
-    // Quitamos la marca a cualquier otra fila que haya estado seleccionada antes
-    document.querySelectorAll('.report-results table tbody tr').forEach(tr => {
-        tr.classList.remove('fila-seleccionada');
-    });
-    
-    // Le agregamos el color fijo a la fila en la que se acaba de hacer clic
-    if (elementoFila) {
-        elementoFila.classList.add('fila-seleccionada');
-    }
-
-    const  panel  = document.getElementById("detalle-panel");
-    const  contenido  = document.getElementById("detalle-contenido");
-    const  fechaLabel  = document.getElementById("detalle-fecha");
- 
-    fechaLabel.textContent  = `Corte  del  ${new Date(corte.fecha).toLocaleString("es-MX")}`;
- 
-    let  html =  `
-       <div><strong>Usuario:</strong>  ${corte.usuario}</div>
-       <div><strong>Estación:</strong>  ${corte.estacion}</div>
-       <div><strong>Tickets:</strong>  ${corte.tickets}</div>
-       <div><strong>Efectivo:</strong>  ${corte.totalCash.toFixed(2)}</div>
-       <div><strong>Tarjeta:</strong>  ${corte.totalCard.toFixed(2)}</div>
-       <div><strong>Transferencia:</strong>  ${corte.totalTransfer.toFixed(2)}</div>
-       <div><strong>Total:</strong>  ${corte.totalIngresos.toFixed(2)}</div>
-       <hr>
-        <div><strong>Artículos vendidos:</strong></div>
-        <ul style="padding-left:20px;">${
-           Object.values(corte.articulos  || {}).map(a  =>
-              `<li>${a.nombre}  — ${a.qty}  —  $${a.monto.toFixed(2)}</li>`
-          ).join("")
-        }</ul>
-    `;
-
-    contenido.innerHTML  =  html;
-    panel.classList.remove("hidden");
-}
  
  function cerrarDetalle()  {
     document.getElementById("detalle-panel").classList.add("hidden");
@@ -533,6 +794,3 @@ document.addEventListener("keydown", (e)  =>  {
         }
     }
  });
-
-
-
