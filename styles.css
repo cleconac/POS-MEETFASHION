@@ -553,14 +553,6 @@ body{margin:0;background:var(--bg);color:#222}
   border-color: blue;
 }
 
-.denom-input {
-    font-size: 1.3rem;
-    padding: 5px;
-    border: 2px solid #ddd;
-    border-radius: 12px;
-    margin-left: 5%;
-}
-
 #denoms-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr); /* dos columnas iguales */
@@ -570,7 +562,7 @@ body{margin:0;background:var(--bg);color:#222}
 
 #denoms-list div {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   padding: 4px 0;
 }
@@ -581,25 +573,19 @@ body{margin:0;background:var(--bg);color:#222}
   color: #333;
 }
 
-.denom-input {
-  font-size: 1.2rem;
-  padding: 6px 10px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  width: 100px;
-  text-align: right;
-}
-
 .total-conteo-efectivo {
-    margin-top: auto;
-    background: #1f2937;
-    color: white;
-    border-radius: 12px;
-    padding: 15px;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: 15px;
+    min-width: 110px;
     text-align: center;
+    font-family: monospace;
+    box-sizing: border-box;
+
 }
-
-
 
 body  {
    font-family:  'Inter',  system-ui,  sans-serif;
@@ -683,7 +669,6 @@ body  {
 }
  
  h2,  h3 {
-     margin: 0;
      font-weight: 600;
  }
  
@@ -873,3 +858,339 @@ z-index:9999;
 .btn-sec:hover {
     background: #d5d5d5;
 }
+
+
+/* ========================================================
+   DROPDOWN MENÚ FLOTANTE DE ALTA FIDELIDAD (CSS PURO)
+   ======================================================== */
+
+/* Contenedor padre relativo */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* 👑 LA TARJETA DESPLEGABLE PROFESIONAL FLOTANTE */
+.dropdown-menu-card {
+    display: none; /* Se oculta por defecto en CSS puro */
+    position: absolute;
+    top: calc(100% + 4px); /* Espacio de aireado debajo de la barra */
+    right: 0; /* Alineación estética al borde derecho */
+    background-color: #ffffff;
+    min-width: 160px;
+    border-radius: 8px; /* Curvatura moderna de tarjeta */
+    border: 1px solid #e2e8f0; /* Borde sutil traslúcido, adiós al negro rígido */
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08); /* Sombreado flotante premium */
+    padding: 6px;
+    z-index: 1000;
+}
+
+/* 🔥 DISPARADOR EN CSS PURO: Al pasar el mouse por el botón, emerge la tarjeta */
+.dropdown:hover .dropdown-menu-card {
+    display: flex;
+    flex-direction: column; /* Alinea tus botones verticalmente */
+    gap: 4px; /* Separación uniforme entre botones */
+    animation: slideInMenu 0.15s ease-out; /* Micro-animación de entrada */
+}
+
+/* 🏷️ ESTILOS PARA TUS BOTONES NATIVOS INTERNOS */
+.dropdown-menu-card button.small {
+    background: transparent !important; /* Quitamos el fondo rígido antiguo */
+    color: #334155 !important; /* Gris ejecutivo oscuro */
+    border: none !important;
+    width: 100% !important;
+    text-align: left !important; /* Alineación limpia a la izquierda */
+    padding: 10px 14px !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px; /* Separación del icono y tu texto */
+    border-radius: 6px !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+/* EFECTO HOVER INTERNO: Ilumina la opción con tu azul sutil al pasar el mouse */
+.dropdown-menu-card button.small:hover {
+    background-color: #f0f6ff !important; /* Fondo azul pastel suave */
+    color: #0066ff !important; /* Texto azul corporativo */
+}
+
+/* Iconos de apoyo minimalistas */
+.menu-icon {
+    font-size: 14px;
+    filter: grayscale(15%); /* Suaviza ligeramente los emojis */
+}
+
+/* 🎬 MICRO-ANIMACIÓN DE ENTRADA SUAVE (EFECTO FLOTANTE) */
+@keyframes slideInMenu {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================================
+   BARRA LATERAL CON TIRADOR VISUAL INTUITIVO (CSS PURO)
+   ======================================================== */
+
+/* Contenedor principal de la barra anclado a la izquierda */
+.sidebar-container {
+    position: fixed;
+    top: 0;
+    left: -260px; /* Se esconde exactamente su ancho completo */
+    width: 260px;
+    height: 100vh;
+    background-color: #1e293b; /* Gris Oxford corporativo profundo */
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 2000; /* Por encima de todo el POS */
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Transición ultrasuave */
+}
+
+/* 🔥 EL TIRADOR VISUAL INTUITIVO: Una pequeña pestaña que sobresale en el borde izquierdo */
+.sidebar-container::after {
+    content: '⚙️ Admin'; /* Texto o icono guía para la cajera */
+    position: absolute;
+    top: 50%;
+    right: -35px; /* Sobresale 35px del borde oculto hacia la pantalla */
+    transform: translateY(-50%) rotate(270deg); /* Lo centramos verticalmente y lo rotamos */
+    transform-origin: center;
+    background-color: #0066ff; /* Tu azul de MeetFashion */
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 6px 6px 0 0; /* Bordes curvos estéticos hacia afuera */
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, right 0.2s ease;
+}
+
+/* --- 🔥 DISPARADORES DE ENTRADA (CSS PURO) --- */
+
+/* Cuando pasas el mouse sobre la barra o sobre la pestaña, el panel se despliega */
+.sidebar-container:hover {
+    left: 0; /* Se desliza elegantemente al frente */
+}
+
+/* 🧠 EFECTO UX: Cuando la barra ya se abrió, la pestaña se oculta para no estorbar el menú */
+.sidebar-container:hover::after {
+    opacity: 0;
+    right: 0;
+    pointer-events: none; /* Desactiva clics fantasmas mientras el menú está abierto */
+}
+
+/* ========================================================
+   MANTENEMOS EL RESTO DE TUS ESTALOS DE LA BARRA COMPLETAMENTE IDÉNTICOS
+   ======================================================== */
+.sidebar-header {
+    padding: 24px 20px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sidebar-brand {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-subtitle {
+    color: #94a3b8;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sidebar-menu-list {
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-grow: 1;
+}
+
+.sidebar-item {
+    background: transparent !important;
+    color: #cbd5e1 !important;
+    border: none !important;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    border-radius: 8px !important;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease !important;
+}
+
+.sidebar-item:hover {
+    background-color: #0066ff !important;
+    color: #ffffff !important;
+    transform: translateX(4px);
+}
+
+.sidebar-item:active {
+    transform: scale(0.98) translateX(4px);
+}
+
+.sidebar-icon {
+    font-size: 16px;
+}
+
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #334155;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+}
+
+
+/* ========================================================
+   🔥 CORRECCIÓN: TIRADOR VISUAL EXPANDIDO Y BLINDADO
+   ======================================================== */
+.sidebar-container::after {
+    content: '⚙️\A A\A D\A M\A I\A N'; /* Texto vertical nativo usando saltos de línea (\A) */
+    white-space: pre-wrap; /* Permite que los saltos de línea se dibujen en la pantalla */
+    text-align: center;
+    line-height: 1.4;
+    
+    position: absolute;
+    top: 50%;
+    right: -28px; /* Sobresale de forma obligatoria y fija hacia el frente del POS */
+    transform: translateY(-50%); /* Centrado vertical matemático perfecto sin rotación */
+    
+    width: 28px; /* Ancho cómodo para que no se recorte el texto */
+    padding: 14px 0; /* Estilizado vertical tipo pestaña de archivo */
+    background-color: #0066ff; /* Tu azul corporativo de MeetFashion */
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    
+    border-radius: 0 8px 8px 0; /* Bordes redondeados modernos solo en el lado que ve la cajera */
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: opacity 0.2s ease, right 0.2s ease, background-color 0.2s ease;
+}
+
+/* Efecto hover sobre la pestañita antes de abrir para invitar al click */
+.sidebar-container:not(:hover)::after:hover {
+    background-color: #0052cc;
+    right: -32px; /* Hace un micro-empuje hacia afuera indicando interacción */
+}
+
+/* 🧠 EFECTO UX: Cuando el panel se abre, la pestaña se desvanece por completo */
+.sidebar-container:hover::after {
+    opacity: 0;
+    right: 0;
+    pointer-events: none;
+}
+
+/* ========================================================
+   BARRA LATERAL CON MÓDULO ANTI-PARPADEO (HIGH FIDELITY)
+   ======================================================== */
+
+/* Contenedor principal de la barra anclado a la izquierda */
+.sidebar-container {
+    position: fixed;
+    top: 0;
+    left: -260px; /* Escondida fuera de la pantalla */
+    width: 260px;
+    height: 100vh;
+    background-color: #1e293b; /* Gris Oxford corporativo profundo */
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 2000;
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1); /* Animación ultrasuave */
+}
+
+/* 🧠 EL PUENTE ANTI-PARPADEO: Un receptor invisible de 40px que sobresale.
+   Al abrirse la barra, este elemento se expande cubriendo el espacio intermedio,
+   impediendo físicamente que el mouse pierda el contacto con el menú. */
+.sidebar-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -40px; /* Pestaña invisible ancha */
+    width: 40px;
+    height: 100%;
+    background: transparent;
+    cursor: pointer;
+    z-index: 1999;
+}
+
+/* 🔥 EL TIRADOR VISUAL EXPANDIDO Y ESTABLE */
+.sidebar-container::after {
+    content: '⚙️ ADMIN'; 
+    /* 📐 MÓDULO DE ROTACIÓN NATIVA */
+    writing-mode: sideways-lr; 
+    white-space: pre-wrap; 
+    text-align: center;
+    line-height: 1.4;
+    
+    position: absolute;
+    top: 50%;
+    right: -28px; 
+    transform: translateY(-50%); 
+    
+    width: 28px; 
+    padding: 14px 0; 
+    background-color: #0066ff; 
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    
+    border-radius: 0 8px 8px 0; 
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    z-index: 2001; /* Siempre al frente de la zona invisible */
+    transition: opacity 0.2s ease, right 0.2s ease, background-color 0.2s ease;
+}
+
+/* --- 🔥 DISPARADORES DE ENTRADA CORREGIDOS --- */
+
+/* Cuando pasas el mouse por encima de la barra lateral o del puente, se abre y se queda fija */
+.sidebar-container:hover {
+    left: 0; /* Se desliza de forma impecable sin parpadear */
+}
+
+/* Cuando el menú ya está completamente abierto, ensanchamos la zona de captura invisible 
+   hacia la derecha para que si alejas un poco el mouse por error, el panel no se cierre agresivamente */
+.sidebar-container:hover::before {
+    right: -100px;
+    width: 100px;
+}
+
+/* Ocultamos suavemente la pestaña azul únicamente cuando la barra ya se desplegó por completo */
+.sidebar-container:hover::after {
+    opacity: 0;
+    right: 0;
+    pointer-events: none;
+}
+
+ .topbar-left  h2 {
+     margin:  0;
+    font-size:  18px;
+ }
+
