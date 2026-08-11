@@ -190,3 +190,47 @@ DB.saveInventoryLog = function(logList) {
     localStorage.setItem('pos_inventory_log', JSON.stringify(logList));
 };
 
+
+// ESTRUCTURA CORRECTA PARA EL FINAL DE TU DB.JS:
+DB.getInventoryLog = function() {
+    return JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+};
+
+DB.saveInventoryLog = function(logList) {
+    localStorage.setItem('pos_inventory_log', JSON.stringify(logList));
+};
+
+
+// ====================================================================
+// 📦 MÓDULOS DE PERSISTENCIA PARA CATÁLOGO E INVENTARIOS
+// ====================================================================
+
+    // 🔍 1. Recupera la lista completa de artículos desde el disco duro
+    DB.getProducts = function() {
+        return JSON.parse(localStorage.getItem('productos')) || 
+               JSON.parse(localStorage.getItem('catalog')) || [];
+    };
+
+    // 💾 2. Sobrescribe y consolida el catálogo con los niveles de stock corregidos
+    DB.saveProducts = function(arrayProductos) {
+        if (!Array.isArray(arrayProductos)) return false;
+        
+        // Sincronizamos ambas llaves por compatibilidad de tus módulos antiguos
+        localStorage.setItem('productos', JSON.stringify(arrayProductos));
+        localStorage.setItem('catalog', JSON.stringify(arrayProductos));
+        return true;
+    };
+
+    // 📊 3. Recupera el historial contable de movimientos de stock (Kardex)
+    DB.getKardex = function() {
+        return JSON.parse(localStorage.getItem('kardex_inventario')) || [];
+    };
+
+    // ✍️ 4. Registra las firmas de auditoría y mermas en el historial inmutable
+    DB.saveKardex = function(arrayHistorial) {
+        if (!Array.isArray(arrayHistorial)) return false;
+        localStorage.setItem('kardex_inventario', JSON.stringify(arrayHistorial));
+        return true;
+    };
+
+
