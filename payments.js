@@ -69,12 +69,70 @@ export function initPayments(getCartFn, clearCartFn, onSaleDone) {
 	}  else  if  (typeof window.actualizarTicketDisplay  ===  "function")  {
 	       window.actualizarTicketDisplay();
 	}
+
         const { totalPagado, cambio, cash, card, transfer } = calcularPago();
-        if (totalPagado < currentSaleTotal) {
-            if (!confirm(`El total pagado (${fmtMX(totalPagado)}) es menor al total (${fmtMX(currentSaleTotal)}). ¿Registrar la venta de todos modos?`)) {
-                return;
-            }
-        }
+
+
+  // ====================================================================
+  // 🔒 BLOQUEO PERIMETRAL DE COBRO: ANULACIÓN DE FUGAS FINANCIERAS
+  // Usamos 'total' que es la variable nativa real de tu sistema
+  // ====================================================================
+  
+  // ❌ CANDADO 1: Bloqueo absoluto si el dinero es insuficiente
+  if (totalPagado < currentSaleTotal) {
+      const faltante = currentSaleTotal - totalPagado;
+      alert(`❌ OPERACIÓN RECHAZADA:\nEl monto ingresado (${fmtMX(totalPagado)}) es insuficiente para liquidar el total de la venta (${fmtMX(currentSaleTotal)}).\nFaltan ${fmtMX(faltante)} por cubrir.`);
+      return; // 🛑 Detiene el flujo de forma definitiva. Impide registrar la venta.
+  }
+
+  // 🔒 CANDADO 2: CONTROL ESTRICTO DE CANALES ELECTRÓNICOS (PAGO ÚNICO EXACTO)
+  // Caso A: Pago único exclusivo con Tarjeta (card)
+  if (card > 0 && cash === 0 && transfer === 0) {
+      if (card !== currentSaleTotal) {
+          alert(`❌ ERROR DE COBRO DE TARJETA:\nLos pagos electrónicos únicos deben ser por el monto EXACTO de la venta.\nTotal venta: ${fmtMX(currentSaleTotal)} | Ingresado: ${fmtMX(card)}.\nPor favor, corrige el valor antes de continuar.`);
+          return;
+      }
+  }
+
+  // Caso B: Pago único exclusivo con Transferencia (transfer)
+  if (transfer > 0 && cash === 0 && card === 0) {
+      if (transfer !== currentSaleTotal) {
+          alert(`❌ ERROR DE COBRO DE TRANSFERENCIA:\nLos pagos electrónicos únicos deben ser por el monto EXACTO de la venta.\nTotal venta: ${fmtMX(currentSaleTotal)} | Ingresado: ${fmtMX(transfer)}.\nPor favor, corrige el valor antes de continuar.`);
+          return;
+      }
+  }
+
+  // ====================================================================
+  // 🔥 CANDADO 3: BLINDAJE DE PAGO MIXTO MULTICANAL (EVITA CAMBIOS FALSOS)
+  // ====================================================================
+  if (card > 0 || transfer > 0) {
+      const dineroDigitalTotal = card + transfer;
+
+      // Regla de Oro: Lo cobrado en terminales digitales jamás puede superar el total original
+      if (dineroDigitalTotal > currentSaleTotal) {
+          alert(`❌ PAGO MIXTO RECHAZADA:\nEl dinero digital cobrado en tarjeta/transferencia (${fmtMX(dineroDigitalTotal)}) no puede superar el total de la venta (${fmtMX(currentSaleTotal)}).\nLas terminales electrónicas no generan cambio en efectivo.`);
+          return; 
+      }
+
+      // Regla de Plata: Control de excedentes en efectivo
+      if (cash > 0) {
+          // Escenario A: El efectivo por sí solo ya cubrió o superó el total de la compra
+          if (cash >= currentSaleTotal) {
+              const cambioReal = cash - currentSaleTotal;
+              alert(`❌ ERROR DE BALANCE MIXTO:\nEl dinero en efectivo ingresado (${fmtMX(cash)}) ya cubre por completo el total de la venta (${fmtMX(currentSaleTotal)}) generando un cambio real de ${fmtMX(cambioReal)}.\nNo es posible añadir montos en Tarjeta o Transferencia a esta transacción.`);
+              return;
+          }
+
+          // Escenario B: El efectivo cubre una parte, validamos que lo digital no genere cambio falso
+          const maximoDigitalPermitido = currentSaleTotal - cash;
+          if (dineroDigitalTotal > maximoDigitalPermitido) {
+              alert(`❌ ERROR DE BALANCE MIXTO:\nSi el cliente paga ${fmtMX(cash)} en efectivo, el monto máximo permitido para tarjeta/transferencia es de ${fmtMX(maximoDigitalPermitido)}.\nActualmente ingresaste ${fmtMX(dineroDigitalTotal)} en digital, lo que genera un cambio falso.`);
+              return;
+          }
+      }
+
+}
+
 
         // construir venta
         const ventas = DB.getSales();
