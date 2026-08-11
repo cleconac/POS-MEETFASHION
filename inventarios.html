@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>MeetFashion - Gestión de Inventario y Conteo Físico</title>
+    <link rel="stylesheet" href="./css/inventarios.css">
+</head>
+<body>
+
+    <!-- 👑 HEADER ADMINISTRATIVO PREMIUM -->
+    <header class="topbar">
+        <div class="tittle">
+            <h2>Gestión de Inventarios</h2>
+        </div>
+        <div class="topbar-actions-section">
+            <button id="btn-back-pos" class="btn-sec">
+                <span>↩️</span> Volver al POS
+            </button>
+            <!-- 🔥 NUEVO GATILLO CENTRALIZADO EN LA TOPBAR -->
+            <button type="button" id="btn-generate-template" class="btn-primary-topbar">
+                <span>📋</span> Iniciar Conteo Físico
+            </button>
+            <!-- Botón de guardado masivo (arranca oculto) -->
+            <button id="btn-save-inventory" class="btn-success-topbar" style="display: none;">
+                <span>💾</span> Aplicar cambios
+            </button>
+        </div>
+    </header>
+
+    <!-- 📊 CONTENEDOR MAESTRO CENTRAL -->
+    <main class="main-content-wrapper">
+        
+        <!-- 📊 ESTADO A: PANEL DE CAPTURA MASIVA PANTALLA COMPLETA (Arranca oculto) -->
+        <div id="active-inventory-panel" class="inventory-card active-panel-state" style="display: none;">
+            <div class="card-header-flex">
+                <h1 class="card-title-main">Hojas de Conteo Activas</h1>
+                <div class="card-header-actions">
+                    <button type="button" id="btn-cancel-inventory" class="btn-danger-cancel">
+                        <span>❌</span> Cancelar Conteo
+                    </button>
+                    <input type="text" id="inv-search" class="search-box-premium" placeholder="🔎 Filtrar lista o saltar a producto...">
+                </div>
+            </div>
+
+            <table class="table-inventory">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descripción del Producto</th>
+                        <th class="text-center">Stock Sistema</th>
+                        <th class="text-center">Conteo Físico Real</th>
+                        <th class="text-center">Diferencia</th>
+                        <th>Motivo del Ajuste (Obligatorio si varía)</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-table-body">
+                    <!-- Inyección dinámica de artículos -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 📜 ESTADO B: HISTORIAL KARDEX EN DOS COLUMNAS DE ALTA VISIBILIDAD (Arranca visible) -->
+        <div id="kardex-history-panel" class="inventory-card history-panel-state">
+        <div class="inventory-card" style="width: 100%; max-width: 1400px; margin-top: 0; padding: 24px;">
+            
+            <!-- 🎯 EL AJUSTE: Encabezado flexible con botón de exportación -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
+                    <span>📋</span> Historial de Auditorías de Almacén (Kardex por Orden)
+                </h3>
+                <button type="button" id="btn-exportar-kardex" class="btn-sec" style="background: #28a745; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    📊 Exportar CSV
+                </button>
+            </div>
+
+            
+            <div class="kardex-layout-split">
+                <!-- Columna Izquierda: Órdenes consolidadas -->
+                <div class="kardex-column-left">
+                    <table class="table-inventory font-small">
+                        <thead>
+                            <tr class="bg-gray-sub">
+                                <th>ID Orden</th>
+                                <th>Fecha / Hora</th>
+                                <th class="text-center">Estación</th>
+                                <th>Usuario</th>
+                                <th class="text-center">Ajustes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kardex-orders-tbody">
+                            <!-- Se poblará dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Columna Derecha: Panel de Desglose Resumen -->
+                <div id="kardex-preview-panel" class="kardex-column-right-preview">
+                    <div id="kardex-preview-empty" class="preview-empty-state">
+                        <span class="preview-icon">🔍</span>
+                        Selecciona una orden de inventario a la izquierda para previsualizar el desglose de mermas y ajustes.
+                    </div>
+                    <div id="kardex-preview-content" style="display: none;">
+                        <!-- Se poblará dinámicamente al dar click -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+<script src="db.js"></script>
+<script src="auth.js"></script>
+<script src="./js/inventarios.js"></script>
+</body>
+</html>
