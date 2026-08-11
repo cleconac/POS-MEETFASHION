@@ -4,12 +4,7 @@
 <meta charset="utf-8"><title>Usuarios - POS</title>
 <link rel="stylesheet" href="styles.css">
 <style>
-.container-small{ max-width:100%; margin:28px auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.06); }
-.form-row{ display:flex; gap:10px; flex-wrap:wrap; }
-.form-row input, .form-row select{ padding:10px; border-radius:6px; border:1px solid #ddd; flex:1; }
-.user-list{ margin-top:20px; }
-.user-row{ display:flex; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #f0f0f0; align-items:center; }
-.small-btn{ padding:6px 8px; font-size:13px; }
+.container-small{ max-width:100%; margin:auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.06); }
 </style>
 <script>
 function  initAutocomplete()  {
@@ -35,17 +30,15 @@ const activeUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null
 <body>
 
 <header class="topbar">
-    <div class="title">Gestión de Usuarios</div>
+    <div class="title">
+	<h2 style="color:white;">Gestión de Usuarios</h2>
+    </div>
     <div  class="topbar-left">
-       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+       <button class="btn-sec" onclick="location.href='ventas.html'"><span>↩️</span> Volver al POS</button>
        <button  class="btn small" onclick="abrirModalNuevo()">+ Agregar  usuario</button>
    </div>
 </header>
 <div class="container container-small">
-
-<div class="user-header">
-    <h2>Usuarios</h2>
-</div>
 
 <table  class="user-table">
    <thead>
@@ -173,6 +166,7 @@ const activeUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null
               <div style="margin-left: 24px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
                   <label><input type="checkbox" id="p-rep-ventas"> Ventas (Option)</label>
                   <label><input type="checkbox" id="p-rep-cortes"> Cortes (Option)</label>
+	         <label><input type="checkbox" id="p-rep-tickets"> Tickets (Option)</label>
                   <label><input type="checkbox" id="p-rep-exp"> Exportar CSV</label>
               </div>
           </div>
@@ -201,6 +195,16 @@ const activeUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null
                   <label><input type="checkbox" id="p-est-add"> Agregar Estación</label>
               </div>
           </div>
+
+          <!-- + INVENTARIOS  -->
+          <div style="margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label style="font-weight: bold; display: flex; align-items: center; gap: 6px; color: #1e293b; font-size: 14px;">
+	        <input type="checkbox" id="p-inventarios-ver"> 📦 + Inventarios (Habilitar Sección)
+	      </label>
+              <div style="margin-left: 24px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+	        <label><input type="checkbox" id="p-inventarios-conteo"> Iniciar Conteo Físico (Botón)</label>
+	    </div>
+	</div>
 
           <!-- Botones de Acción de la Modal -->
           <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f3f5; padding-top: 15px;">
@@ -268,6 +272,7 @@ function saveUser(){
 
    // 5. Guardar y refrescar interfaz
    DB.saveUser(obj);
+   alert("¡Usuario actualizado con éxito!");
    renderUsers();
    cerrarModal();
 }
@@ -331,7 +336,6 @@ function abrirModalEditar(u){
 
   const estacionActual = obj.estacion || "";
   poblarSelectorEstaciones(estacionActual);
-
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -356,81 +360,115 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-
+// ====================================================================
+// RENDER PARA USUARIOS
+// ====================================================================
 function renderUsers(){
    const ul = document.getElementById('user-list');
    if (!ul) return; 
    
    const users = DB.getUsers();
+   // 🔍 1. Mapeo seguro: Traemos el catálogo de estaciones vigente del LocalStorage
+   const estacionesDB = DB.getStations ? DB.getStations() : [];
+   
    ul.innerHTML = '';
    
    const aliasLogueado = (activeUserSession?.user || activeUserSession?.usuario || '').toLowerCase();
-   const rolLogueado = (activeUserSession?.role || activeUserSession?.rol || '').toLowerCase();
+   const esMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin';
    
-   // El operador actual es maestro si su alias es raíz o si ostenta el rol MASTER
-   const operadorEsElMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin' || rolLogueado === 'master';
-   const esMaestro = operadorEsElMaestro; // Mantenemos consistencia con tus variables internas
-   
-   const p = esMaestro ? { editar: true, eliminar: true, ver_mapa: true, crear: true } : (activeUserSession?.permisos?.usuarios || {});
+   const p = esMaestro ? { editar: true, eliminar: true, ver_mapa: true } : (activeUserSession?.permisos?.usuarios || {});
 
    users.forEach(u => {
       const loginUser = u.user || '';
       const rolUser = u.role || 'vendedor';
       
-      const loginUserMinusculas = loginUser.toLowerCase();
-      const rolUserMinusculas = rolUser.toLowerCase();
+      // ====================================================================
+      // 🔥 CRUCE INTELIGENTE DE TEXTO PLANO CONTRA BASE DE DATOS DE ESTACIONES
+      // Buscamos si el texto original (ej. "Chabacano") coincide con lo que el 
+      // JavaScript resguardó en su variable global de historial al editar.
+      // ====================================================================
+      let nombreEstacionVigente = u.estacion || '';
       
-      // La fila pertenece al maestro si cumple con el alias o si tiene el rol supremo
-      const esFilaDelMaestro = loginUserMinusculas === 'sup' || loginUserMinusculas === 'admin' || rolUserMinusculas === 'master';
+      if (nombreEstacionVigente && loginUser.toLowerCase() !== 'sup') {
+          // 1. Intentamos verificar si el nombre que tiene escrito el usuario EXISTE actualmente
+          const existeTalCual = estacionesDB.some(e => e.nombre.toLowerCase() === nombreEstacionVigente.toLowerCase());
+          
+          if (!existeTalCual) {
+              // 2. Si NO existe tal cual, significa que la estación se renombró o se borró.
+              // Revisamos en tu base de datos de usuarios general de LocalStorage si la función 
+              // 'saveStation' ya actualizó el registro en el disco duro para este usuario específico.
+              const usuariosGuardadosDisco = DB.getUsers() || [];
+              const coincidenciaDisco = usuariosGuardadosDisco.find(x => x.user === u.user);
+              
+              if (coincidenciaDisco && coincidenciaDisco.estacion) {
+                  nombreEstacionVigente = coincidenciaDisco.estacion;
+              } else {
+                  // Respaldo de seguridad si la estación fue eliminada por completo
+                  nombreEstacionVigente = "Salto del Agua";
+              }
+          }
+      }
 
       let botonEditarHtml = '';
       let botonEliminarHtml = '';
       let botonMapaHtml = '';
       let botonPermisosHtml = '';
 
-      // ✏️ EVALUAR BOTÓN EDITAR
+
+      // ========================================================
+      // ✏️ REGLA DE EDICIÓN BLINDADA PARA EL ROL MASTER
+      // ========================================================
       if (esMaestro || p.editar) {
-          if (esFilaDelMaestro && !operadorEsElMaestro) {
-              // Si Wendy (admin) ve la fila de un MASTER, el botón se bloquea por seguridad
-              botonEditarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="No tienes permisos para alterar a un usuario MASTER.">✏️ Editar</button>`;
+          if (rolUser.toLowerCase() === 'master') {
+              // El botón de Editar para un MASTER solo se genera si el usuario logueado en la terminal es ÉL MISMO
+              if (loginUser.toLowerCase() === aliasLogueado) {
+                  botonEditarHtml = `<button class="btn small btn-editar-user" style="background-color: #0066ff;" onclick="abrirModalEditar('${loginUser}')">✏️ Editar</button>`;
+              } else {
+                  // Si Wendy (ADMIN) ve la fila de Carlos (MASTER), el botón nace deshabilitado en gris por seguridad
+                  botonEditarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="Solo el propietario MASTER puede editar su propio perfil.">✏️ Editar</button>`;
+              }
           } else {
-              botonEditarHtml = `<button class="btn small" style="background-color: #0066ff;" onclick="abrirModalEditar('${loginUser}')">✏️ Editar</button>`;
+              // Comportamiento normal para el resto de los empleados (Vendedores y Admins seccionales)
+              botonEditarHtml = `<button class="btn small btn-editar-user" style="background-color: #0066ff;" onclick="abrirModalEditar('${loginUser}')">✏️ Editar</button>`;
           }
       }
 
-      // 🗑️ EVALUAR BOTÓN ELIMINAR
+      // ========================================================
+      // 🗑️ REGLA DE ELIMINACIÓN INDESTRUCTIBLE PARA EL ROL MASTER
+      // ========================================================
       if (esMaestro || p.eliminar) {
-          if (esFilaDelMaestro) {
-              // Los perfiles MASTER son imborrables para mantener la estabilidad del POS
-              botonEliminarHtml = `<button class="btn small" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed;" title="Los usuarios MASTER son imborrables para la seguridad del POS.">🗑️ Eliminar</button>`;
+          if (rolUser.toLowerCase() === 'master') {
+              // El botón de eliminar para perfiles MASTER se destruye por completo del DOM. No debe existir jamás.
+              botonEliminarHtml = ''; 
           } else {
+              // El resto de los perfiles conservan su botón rojo normal de borrado
               botonEliminarHtml = `<button class="btn small btn-eliminar-user" style="background-color: #dc3545;" onclick="deleteUser('${loginUser}')">🗑️ Eliminar</button>`;
           }
       }
 
-      // 📍 EVALUAR BOTÓN VER MAPA
+
       if (esMaestro || p.ver_mapa) {
           botonMapaHtml = `<button class="btn small btn-mapa-user" style="background-color: #17a2b8;" onclick="verifyAddress('${encodeURIComponent(u.address || '')}')">📍 Ver mapa</button>`;
       }
 
-      // 🔑 EVALUAR BOTÓN PERMISOS
-      if (rolUserMinusculas === 'admin' || rolUserMinusculas === 'master') {
-          if (esFilaDelMaestro) {
-              // Si es un MASTER, muestra la insignia de control supremo indestructible
-              botonPermisosHtml = `<button class="btn small" disabled style="background:#059669; color:white; cursor:not-allowed;" title="Acceso Absoluto del Sistema">👑 Master</button>`;
+      if (rolUser.toLowerCase() === 'admin' || rolUser.toLowerCase() === 'master') {
+          if (rolUser.toLowerCase() === 'master') {
+              botonPermisosHtml = `<button class="btn small" disabled style="background:#059669; color:white; cursor:not-allowed;" title="Administrador Maestro Absoluto">👑 MASTER</button>`;
           } else if (esMaestro || p.crear || p.editar) { 
               botonPermisosHtml = `<button class="btn small" onclick="abrirModalPermisos('${loginUser}')" style="background-color: #6f42c1; color: white;">🔑 Permisos</button>`;
           }
       }
 
-      // INYECCIÓN VISUAL CON LOS CANDADOS Y TEXTOS DE ROLES UNIFICADOS
       const tr = document.createElement('tr');
       tr.innerHTML = `
-         <td><strong>${loginUser}</strong></td>
+          <td><strong>${loginUser}</strong></td>
           <td>${u.name || ''}</td>
-          <td><span style="${esFilaDelMaestro ? 'color: #059669; font-weight: bold;' : ''}">${rolUser.toUpperCase()}</span></td>
+          <td><span style="${loginUser.toLowerCase() === 'sup' ? 'color: #059669; font-weight: bold;' : ''}">${rolUser.toUpperCase()}</span></td>
           <td>${u.shift || ''}</td>
-          <td>${esFilaDelMaestro ? '<span style="color: #64748b; font-weight: 500;">🌐 Acceso Global</span>' : (u.estacion || '—')}</td>
+          
+          <!-- 🔥 LA CORRECCIÓN: Inyectamos 'nombreEstacionVigente' en lugar de la variable congelada 'u.estacion' -->
+          <td>${rolUser.toLowerCase() === 'master' ? '🌐 Acceso Global' : nombreEstacionVigente}</td>
+          
           <td>${u.mail || ''}</td>
           <td>${u.modified ? new Date(u.modified).toLocaleString() : '-'}</td>
           <td>
@@ -442,6 +480,7 @@ function renderUsers(){
        ul.appendChild(tr);
    });
 }
+
 
 
 
@@ -504,7 +543,7 @@ function poblarSelectorEstaciones(estacionSeleccionada = "") {
     // 3. Añadir una opción por defecto/inicial por si el usuario no tiene estación asignada aún
     const optDefault = document.createElement("option");
     optDefault.value = "";
-    optDefault.textContent = "-- Selecciona Estación (Opcional) --";
+    optDefault.textContent = "-- Selecciona Estación --";
     selectStation.appendChild(optDefault);
 
     // 4. Inyectar las estaciones reales del LocalStorage
@@ -609,7 +648,8 @@ function obtenerMapaAccesoTotal() {
         catalogo: { ver: true, editar: true, eliminar: true, stock: true, historial: true, nuevo: true, importar: true, exportar_cat: true, exportar_stock: true },
         reportes: { ver: true, ventas: true, cortes: true, exportar: true },
         usuarios: { ver: true, crear: true, editar: true, eliminar: true, ver_mapa: true },
-        estaciones: { ver: true, crear: true, editar: true, eliminar: true }
+        estaciones: { ver: true, crear: true, editar: true, eliminar: true },
+        inventarios: { ver: true, conteo: true}
     };
 }
 
@@ -646,7 +686,7 @@ function sincronizarTodosLosPermisos() {
 
     // 2. Mapeo del módulo Reportes (El de tu ejemplo visual)
     actualizarEstadoHijos('p-rep-ver', [
-        'p-rep-ventas', 'p-rep-cortes', 'p-rep-exp'
+        'p-rep-ventas', 'p-rep-cortes', 'p-rep-tickets', 'p-rep-exp'
     ]);
 
     // 3. Mapeo del módulo Usuarios
@@ -658,6 +698,11 @@ function sincronizarTodosLosPermisos() {
     actualizarEstadoHijos('p-est-ver', [
         'p-est-edit', 'p-est-del', 'p-est-add'
     ]);
+
+    // 5. Mapeo del módulo Inventarios
+    actualizarEstadoHijos('p-inventarios-ver', [
+        'p-inventarios-conteo'
+    ]);
 }
 
 // VINCULAR LOS ESCUCHADORES EN EL FORMULARIO
@@ -667,6 +712,7 @@ function inicializarEscuchadoresArbolPermisos() {
     document.getElementById('p-rep-ver')?.addEventListener('change', deleteEvent = sincronizarTodosLosPermisos);
     document.getElementById('p-user-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
     document.getElementById('p-est-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
+    document.getElementById('p-inventarios-ver')?.addEventListener('change', sincronizarTodosLosPermisos);
 }
 
 // Variable global para recordar a qué administrador le estamos editando el árbol
@@ -681,7 +727,7 @@ function abrirModalPermisos(loginUser) {
     document.getElementById('perm-modal-user-title').textContent = `Configurando accesos para el alias: @${loginUser} (${usuario.nombre || 'Administrador Seccional'})`;
 
     // Si el usuario no tiene mapa de permisos guardado previamente, le creamos uno vacío por defecto
-    const p = usuario.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {} };
+    const p = usuario.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {}, inventarios: {} };
 
     // CARGAR VALORES EN LOS CHECKBOXES DESDE LA BASE DE DATOS LOCAL
     document.getElementById('p-cat-ver').checked = p.catalogo?.ver || false;
@@ -696,6 +742,7 @@ function abrirModalPermisos(loginUser) {
 
     document.getElementById('p-rep-ver').checked = p.reportes?.ver || false;
     document.getElementById('p-rep-ventas').checked = p.reportes?.ventas || false;
+    document.getElementById('p-rep-tickets').checked = p.reportes?.tickets || false;
     document.getElementById('p-rep-cortes').checked = p.reportes?.cortes || false;
     document.getElementById('p-rep-exp').checked = p.reportes?.exportar || false;
 
@@ -710,16 +757,32 @@ function abrirModalPermisos(loginUser) {
     document.getElementById('p-est-del').checked = p.estaciones?.eliminar || false;
     document.getElementById('p-est-add').checked = p.estaciones?.crear || false;
 
-    sincronizarTodosLosPermisos();
+    document.getElementById('p-inventarios-ver').checked = p.inventarios?.ver || false;
+    document.getElementById('p-inventarios-conteo').checked = p.inventarios?.conteo || false;
+
+    // 🔥 EJECUTAMOS LA SINCRONIZACIÓN VISUAL YA CON LOS DATOS FRESCOS DEL USUARIO CARGADOS
+    if (typeof sincronizarTodosLosPermisos === "function") sincronizarTodosLosPermisos();
     inicializarEscuchadoresArbolPermisos();
 
     document.getElementById('modal-user-permissions').classList.remove('hidden');
 }
 
+// ====================================================================
+// 🔒 GUARDAR ARBOL DE PERMISOS EXPANDIDO BLINDADO
+// ====================================================================
 function guardarPermisosArbol() {
+    // 🎯 REGLA DE INMUNIDAD 1: Si no hay un usuario objetivo en memoria, abortamos preventivamente
+    if (!currentPermissionsTargetUser) {
+        alert("❌ Error de Auditoría: No se ha detectado el usuario objetivo de la sesión para guardar.");
+        return;
+    }
+
     let lista = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
     
-    // 1. Recopilar el mapa completo del árbol (Tu bloque actual se queda igual)
+    // Normalizamos el alias de control barriendo espacios invisibles y minúsculas
+    const usuarioObjetivoLimpio = String(currentPermissionsTargetUser).trim().toLowerCase();
+
+    // Recopilar el mapa completo del árbol expandido con tus IDs nativos cortos
     const mapaPermisos = {
         catalogo: {
             ver: document.getElementById('p-cat-ver').checked,
@@ -736,6 +799,7 @@ function guardarPermisosArbol() {
             ver: document.getElementById('p-rep-ver').checked,
             ventas: document.getElementById('p-rep-ventas').checked,
             cortes: document.getElementById('p-rep-cortes').checked,
+            tickets: document.getElementById('p-rep-tickets')?.checked || false, 
             exportar: document.getElementById('p-rep-exp').checked
         },
         usuarios: {
@@ -750,18 +814,34 @@ function guardarPermisosArbol() {
             editar: document.getElementById('p-est-edit').checked,
             eliminar: document.getElementById('p-est-del').checked,
             crear: document.getElementById('p-est-add').checked
-        }
+        },
+        inventarios: {
+            ver: document.getElementById('p-inventarios-ver')?.checked || false,
+            conteo: document.getElementById('p-inventarios-conteo')?.checked || false
+        },
     };
 
-    // 2. Buscar al usuario modificado y actualizar su objeto en el arreglo maestro
+    // 🎯 REGLA DE INMUNIDAD 2: COMPROBACIÓN RIGUROSA EN CASCADA
+    let banderaMatchEncontrado = false;
+
     lista = lista.map(u => {
-        if ((u.user || u.usuario) === currentPermissionsTargetUser) {
+        const aliasIteradoLimpio = String(u.user || u.usuario || '').trim().toLowerCase();
+        
+        // Comparamos los strings normalizados libres de fallas por caché de textos
+        if (aliasIteradoLimpio === usuarioObjetivoLimpio) {
+            banderaMatchEncontrado = true;
             return { ...u, permisos: mapaPermisos };
         }
         return u;
     });
 
-    // Guardar en la base de datos persistente (LocalStorage)
+    // ❌ CANDADO DE RESGUARDO CONTABLE: Si el mapeo falló por completo y no halló al usuario, detenemos el proceso
+    if (!banderaMatchEncontrado) {
+        alert(`❌ ERROR DE SINCROINIZACIÓN:\nEl usuario "${currentPermissionsTargetUser}" no coincide con los registros del catálogo maestro.\nNo se realizaron modificaciones para proteger los datos.`);
+        return;
+    }
+
+    // Guardar en la base de datos de forma persistente (LocalStorage)
     if (DB.saveUsers) {
         DB.saveUsers(lista);
     } else {
@@ -769,36 +849,39 @@ function guardarPermisosArbol() {
     }
 
     // ========================================================
-    // 🔥 CORRECCIÓN CRÍTICA: REFRESCO EN TIEMPO REAL SIN F5
+    // 🔥 SINCROINIZACIÓN EN TIEMPO REAL SIN F5
     // ========================================================
-    
-    // A. Si el administrador editado es el mismo que está operando en la terminal (ej: Wendy se auto-edita)
     const usuarioActivoSesion = JSON.parse(sessionStorage.getItem('pos_user'));
-    if (usuarioActivoSesion && (usuarioActivoSesion.user || usuarioActivoSesion.usuario) === currentPermissionsTargetUser) {
-        usuarioActivoSesion.permisos = mapaPermisos;
-        
-        // Sincronizamos la base de datos de la sesión del navegador
-        sessionStorage.setItem('pos_user', JSON.stringify(usuarioActivoSesion));
-        
-        // Sincronizamos la variable global que lee renderUsers() de forma obligatoria
-        if (typeof activeUserSession !== 'undefined') {
-            activeUserSession.permisos = mapaPermisos;
+    if (usuarioActivoSesion) {
+        const aliasSesionLimpio = String(usuarioActivoSesion.user || usuarioActivoSesion.usuario || '').trim().toLowerCase();
+        if (aliasSesionLimpio === usuarioObjetivoLimpio) {
+            usuarioActivoSesion.permisos = mapaPermisos;
+            sessionStorage.setItem('pos_user', JSON.stringify(usuarioActivoSesion));
+            
+            if (typeof activeUserSession !== 'undefined') {
+                activeUserSession.permisos = mapaPermisos;
+            }
         }
     }
 
-    alert("¡Árbol de permisos guardado y actualizado con éxito!");
+    alert(`🎉 ¡Árbol de permisos para @${currentPermissionsTargetUser} guardado con éxito total!`);
     
-    // 3. Cerrar la ventana y volver a pintar las cabeceras y filas con los nuevos candados al instante
-    cerrarModalPermisos();
+    // 3. Cerrar la ventana y volver a pintar las filas y candados al instante
+    if (typeof cerrarModalPermisos === "function") cerrarModalPermisos();
+    else if (document.getElementById('modal-user-permissions')) {
+        document.getElementById('modal-user-permissions').classList.add('hidden');
+    }
     
     if (typeof validarCandadosCabeceraUsuarios === "function") {
-        validarCandadosCabeceraUsuarios(); // Evalúa de nuevo el botón azul superior "+ Agregar"
+        validarCandadosCabeceraUsuarios(); 
     }
     
     if (typeof renderUsers === "function") {
-        renderUsers(); // Redibuja las filas de la tabla ocultando/mostrando Editar, Eliminar o Ver Mapa
+        renderUsers(); 
     }
 }
+
+
 
 
 function cerrarModalPermisos() {
