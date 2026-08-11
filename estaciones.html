@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><title>Estaciones - POS</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="catalog.css">
 <style>
 .container-small{ max-width:100%; margin:28px auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.06); }
 .form-row{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -15,20 +16,15 @@
 <body>
 
 <header class="topbar">
-    <div class="title">Gestión de Estaciones de trabajo</div>
+    <div class="title">
+	<h2 style="color: white;">Gestión de Estaciones de trabajo</h2>
+    </div>
     <div  class="topbar-left">
-       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
-       <button  class="btn small" onclick="abrirModalNuevaEstacion()">Agregar  estación</button>
+       <button class="btn-sec" onclick="location.href='ventas.html'"><span>↩️</span> Volver al POS</button>
+       <button  class="btn small" onclick="abrirModalNuevaEstacion()">+ Agregar  estación</button>
    </div>
 </header>
 <div class="container container-small">
-
-
-
-
-<div class="user-header">
-    <h2>Estaciones</h2>
-</div>
 
 <table  class="user-table">
    <thead>
@@ -64,8 +60,14 @@
      renderStations();
 });
 
-let editId = null; 
+let editId = null;
 
+let nombreEstacionAntesDeEditar = null; // <-- Nueva variable de resguardo global
+
+
+// ====================================================================
+// GUARDAR ESTACIÓN
+// ====================================================================
 function saveStation(){
     const nameIn = document.getElementById('u-station').value.trim();
     if (!nameIn) return alert('Estación requerida');
@@ -75,23 +77,64 @@ function saveStation(){
     // 2. LOGICA DE ACTUALIZACIÓN VS CREACIÓN
     if (editId !== null) {
 
-	// MODO EDITAR: Validar que el nuevo nombre no lo tenga OTRA estación diferente a la que edito
+        // MODO EDITAR: Validar que el nuevo nombre no lo tenga OTRA estación diferente a la que edito
         const existeDuplicado = listaActual.some(e => e.nombre.toLowerCase() === nameIn.toLowerCase() && e.id !== editId);
         if (existeDuplicado) {
             return alert('Este nombre de estación ya está en uso.');
         }
 
-        // MODO EDITAR: Reemplaza el elemento que coincide con el nombre viejo (editId)
+        // ====================================================================
+        // 🔥 EXTRACTOR BASE REFERENCIAL POR ID UNICO
+        // Buscamos en la lista limpia el nombre que TENÍA guardado este ID en el disco
+        // antes de aplicar la mutación del formulario.
+        // ====================================================================
+        const registroOriginalEnDisco = listaActual.find(e => e.id === editId);
+        const nombreTextoAnteriorReal = registroOriginalEnDisco ? registroOriginalEnDisco.nombre : null;
+
+        // MODO EDITAR: Reemplaza el elemento que coincide con el ID
         listaActual = listaActual.map(e => {
-            if (e.id === editId || e.nombre === editId) { 
+            if (e.id === editId) { 
                 return {
                     ...e,
-                    nombre: nameIn, // Aplica el nuevo nombre editado
-                    modified: new Date().toISOString() // Actualiza la fecha
+                    nombre: nameIn, // Aplica el nuevo nombre (ej: "Chabacano Azul")
+                    modified: new Date().toISOString() // Sincroniza el timestamp actual
                 };
             }
             return e;
         });
+
+        // ====================================================================
+        // 🔥 BARRIDO EN CASCADA COMPENSADO DE ALTA TOLERANCIA
+        // ====================================================================
+        if (nombreTextoAnteriorReal && nombreTextoAnteriorReal.toLowerCase() !== nameIn.toLowerCase()) {
+            let listaUsuarios = DB.getUsers ? DB.getUsers() : [];
+            let huboCambiosUsuarios = false;
+            const ahora = new Date().toISOString();
+
+            listaUsuarios = listaUsuarios.map(u => {
+                const estacionUsuarioStr = String(u.estacion || u.station || '').trim().toLowerCase();
+                const textoAnteriorStr = nombreTextoAnteriorReal.trim().toLowerCase();
+
+                // 🎯 REGLA DE ORO DE INTEGRIDAD: 
+                // Si el usuario tiene el texto anterior que recuperamos del ID, lo actualizamos.
+                // También añadimos un respaldo bilingüe por si tu base tiene "Chabacano" a secas.
+                if (estacionUsuarioStr === textoAnteriorStr || (textoAnteriorStr.includes('chabacano') && estacionUsuarioStr === 'chabacano')) {
+                    huboCambiosUsuarios = true;
+                    return {
+                        ...u,
+                        estacion: nameIn, // Nuevo nombre unificado
+                        station: nameIn,  
+                        modified: ahora   
+                    };
+                }
+                return u;
+            });
+
+            // Persistimos los cambios de forma masiva en tu base de datos de usuarios
+            if (huboCambiosUsuarios && DB.saveUsers) {
+                DB.saveUsers(listaUsuarios);
+            }
+        }
         
         editId = null; // Limpia la variable para la siguiente operación
         
@@ -114,29 +157,68 @@ function saveStation(){
     DB.saveStations(listaActual);
 
     document.getElementById('u-station').value = '';
+    alert("¡Estación y usuarios vinculados actualizados en cascada con éxito!");
     cerrarModal();
     renderStations();
 }
 
-// 5. ELIMINACIÓN LIMPIA POR ID ÚNICO
+
+
+// 5. ELIMINACIÓN LIMPIA POR ID ÚNICO (CON REUBICACIÓN EN CASCADA)
 function deleteStation(id){
   const listaActual = DB.getStations();
   if (listaActual.length <= 1) {
       return alert('Debe quedar al menos una estación activa en el sistema.');
   }
 
-  // Buscamos el objeto para mostrar su nombre real en la alerta
+  // Buscamos el objeto para mostrar su nombre real en la alerta y mapear usuarios
   const estacionABorrar = listaActual.find(x => x.id === id);
-  const nombreMostrar = estacionABorrar ? estacionABorrar.nombre : "esta estación";
+  if (!estacionABorrar) return alert('No se encontró la estación seleccionada.');
+  
+  const nombreMostrar = estacionABorrar.nombre;
+  const nombreMinusculas = nombreMostrar.toLowerCase();
 
-  if(!confirm(`¿Eliminar la estación "${nombreMostrar}"?`)) return;
+  // 🔒 CANDADO DE SEGURIDAD BASE: No permitimos borrar la sucursal matriz
+  if (nombreMinusculas === 'salto del agua' || nombreMinusculas === 'principal') {
+      return alert('La estación "Salto del Agua" es el núcleo central del Punto de Venta y no puede ser removida.');
+  }
+
+  if(!confirm(`¿Eliminar la estación "${nombreMostrar}"?\nLos usuarios asociados a ella se mudarán automáticamente a "Salto del Agua".`)) return;
   
   // Filtramos removiendo exclusivamente el ID seleccionado
   const nuevaLista = listaActual.filter(x => x.id !== id);
-  
   DB.saveStations(nuevaLista);
+
+  // ====================================================================
+  // 🔥 MIGRACIÓN EN CASCADA DE USUARIOS HACIA LA ESTACIÓN MATRIZ
+  // ====================================================================
+  let listaUsuarios = DB.getUsers ? DB.getUsers() : [];
+  let huboMigracion = false;
+  const ahora = new Date().toISOString();
+
+  listaUsuarios = listaUsuarios.map(u => {
+      // Si el usuario estaba asignado al nombre de la estación que se está eliminando
+      if (u.estacion === nombreMostrar || u.station === nombreMostrar) {
+          huboMigracion = true;
+          return {
+              ...u,
+              estacion: "Salto del Agua", // Reubicación automática dictada
+              station: "Salto del Agua",  // Resguardo bilingüe
+              modified: ahora            // Estampa de auditoría
+          };
+      }
+      return u;
+  });
+
+  // Si se detectó personal en esa caja, guardamos la base de datos de usuarios
+  if (huboMigracion) {
+      if (DB.saveUsers) DB.saveUsers(listaUsuarios);
+  }
+
   renderStations();
+  alert(`¡La estación fue removida y su personal asignado se trasladó con éxito a "Salto del Agua"!`);
 }
+
 
 function abrirModalNuevaEstacion(){
   editId = null;
@@ -147,18 +229,20 @@ function abrirModalNuevaEstacion(){
 }
 
 function abrirModalEditarEstacion(id){
-  // 1. Buscamos la estación usando su ID único
   const obj = DB.getStations().find(x => x.id === id || x.nombre === id);
   if (!obj) return;
   
-  // 2. Guardamos el ID único (o el nombre si es la estación 'Principal' vieja de respaldo)
   editId = obj.id || obj.nombre; 
   
+  // 🔥 CLAVE: Resguardamos el nombre de texto real (ej: "Chabacano") antes de cualquier edición
+  nombreEstacionAntesDeEditar = obj.nombre; 
+
   document.getElementById('modal-title-station').textContent = 'Editar estación';
   document.getElementById('u-station').value = obj.nombre;
   document.getElementById('u-station').readOnly = false;
   document.getElementById('modal-station').classList.remove('hidden');
 }
+
 
 
 function editStation(u){
