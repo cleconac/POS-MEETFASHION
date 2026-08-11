@@ -99,32 +99,199 @@ document.getElementById('login-cancel').addEventListener('click', ()=> {
   document.getElementById('login-pass').value = '';
 });
 
+
+// ====================================================================
+// 🔒 PASO 1 REPARADO: BLOQUEO PERIMETRAL DE APERTURA INMUNE A CACHÉ
+// ====================================================================
+function validarBloqueoAperturaCaja() {
+    console.log("🔍 [MeetFashion]: Iniciando validarBloqueoAperturaCaja()...");
+
+    const sesionActiva = JSON.parse(sessionStorage.getItem('pos_user'));
+    console.log("🔍 [MeetFashion]: sesionActiva recuperada ->", sesionActiva);
+    
+    const cashierId = (sessionStorage.getItem('pos_cashier') || 
+                       (sesionActiva ? (sesionActiva.user || sesionActiva.usuario) : '')) || '';
+    console.log("🔍 [MeetFashion]: cashierId detectado ->", cashierId);
+                       
+    const estacionActiva = (sessionStorage.getItem('estacion-activa') || 
+                            (sesionActiva ? (sesionActiva.estacion || sesionActiva.station) : 'Salto del Agua')) || 'Salto del Agua';
+    console.log("🔍 [MeetFashion]: estacionActiva detectada ->", estacionActiva);
+
+    // 🔴 PUNTO DE CONTROL 1: Validación de variables de sesión
+    if (!sesionActiva && !cashierId) {
+        console.warn("⚠️ [MeetFashion]: Abortado. No existe sesión activa ni cashierId en sessionStorage.");
+        return;
+    }
+
+    const rolActual = String(sesionActiva?.role || sesionActiva?.rol || 'vendedor').toLowerCase();
+    const aliasLimpio = String(cashierId).trim().toLowerCase();
+    const estacionLimpia = String(estacionActiva).trim().toLowerCase();
+    console.log(`🔍 [MeetFashion]: Variables normalizadas -> Rol: ${rolActual}, Alias: ${aliasLimpio}, Estación: ${estacionLimpia}`);
+
+    // 🔴 PUNTO DE CONTROL 2: Evaluación de privilegios Máster/Admin
+    const esMaestro = rolActual === 'master' || rolActual === 'admin';
+    if (esMaestro) {
+        console.log("👑 [MeetFashion]: Acceso Máster. Inmunidad de apertura otorgada. El bloqueo se salta.");
+        // Tu lógica nativa de escape se queda aquí abajo...
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {	
+                const modal = document.getElementById("modal-cashcount");
+                if (modal && !modal.classList.contains("hidden")) {
+                    modal.classList.add("hidden");
+                    const denomContainer = document.getElementById("denoms-list");
+                    denomContainer?.querySelectorAll(".denom-input").forEach(input => { input.value = 0; });
+                    const totalDisplay = document.getElementById("cashcount-total");
+                    if (totalDisplay) totalDisplay.textContent = fmtMX(0);
+                }
+            }
+        });
+        return;
+    }
+
+    // 🔴 PUNTO DE CONTROL 3: Verificación de la llave física en el LocalStorage
+    const llaveFondoKey = `fondo_apertura_${aliasLimpio}_${estacionLimpia}`;
+    const fondoRegistrado = localStorage.getItem(llaveFondoKey);
+    console.log(`🔍 [MeetFashion]: Buscando llave [${llaveFondoKey}] en LocalStorage. ¿Encontrada? ->`, fondoRegistrado !== null);
+
+    if (!fondoRegistrado) {
+        console.log("🚨 [MeetFashion]: Caja VACÍA detectada. Aplicando bloqueos físicos a la interfaz...");
+
+        const buscadorVentas = document.getElementById('busqueda-box');
+        const btnCobrarPOS = document.getElementById('btn-cobrar');
+        console.log("🔍 [MeetFashion]: Elementos core -> Buscador:", buscadorVentas, "Btn Cobrar:", btnCobrarPOS);
+
+        if (buscadorVentas) {
+            buscadorVentas.disabled = true;
+            buscadorVentas.placeholder = "🔒 Caja bloqueada. Declare su fondo inicial...";
+            buscadorVentas.style.backgroundColor = "#f1f5f9";
+        }
+        if (btnCobrarPOS) {
+            btnCobrarPOS.disabled = true;
+            btnCobrarPOS.style.cursor = "not-allowed";
+            btnCobrarPOS.style.opacity = "0.5";
+        }
+
+        const btnHeaderCatalogo = document.getElementById('btn-catalogo');
+        const btnHeaderConteo   = document.getElementById('btn-cashcount');
+        const btnHeaderCorte    = document.getElementById('btn-corte');
+        const btnHeaderReimpTicket = document.getElementById('btn-reprint');
+
+        const botonesBloquear = [btnHeaderCatalogo, btnHeaderConteo, btnHeaderCorte, btnHeaderReimpTicket];
+        console.log("🔍 [MeetFashion]: Botonera superior detectada ->", botonesBloquear);
+        
+        botonesBloquear.forEach((btn, index) => {
+            if (btn && !btn.textContent.includes('Cerrar sesión')) {
+                btn.disabled = true;
+                btn.style.cursor = "not-allowed";
+                btn.style.opacity = "0.4";
+                btn.style.pointerEvents = "none";
+                btn.title = "🔒 Declare su fondo inicial para activar esta función";
+            } else {
+                console.warn(`⚠️ [MeetFashion]: Botón index [${index}] no localizado en el DOM o incluye texto 'Cerrar sesión'.`);
+            }
+        });
+
+        const modalCashcount = document.getElementById('modal-cashcount');
+        const btnImprimirNativo = document.getElementById('cashcount-print');
+        const btnSalirNativo = document.getElementById('cashcount-close');
+        console.log("🔍 [MeetFashion]: Componentes modal -> Modal:", modalCashcount, "Btn Imprimir:", btnImprimirNativo, "Btn Salir:", btnSalirNativo);
+
+        if (modalCashcount) {
+            if (btnImprimirNativo) btnImprimirNativo.style.display = 'none';
+            if (btnSalirNativo) btnSalirNativo.style.display = 'none';
+
+            let btnAperturaPremium = document.getElementById('btn-confirmar-apertura-turno');
+            if (!btnAperturaPremium) {
+                console.log("📦 [MeetFashion]: Creando botón verde '🔒 Confirmar y Abrir Turno' dinámicamente...");
+                btnAperturaPremium = document.createElement('button');
+                btnAperturaPremium.id = 'btn-confirmar-apertura-turno';
+                btnAperturaPremium.className = 'btn';
+                btnAperturaPremium.style.backgroundColor = '#16803d';
+                btnAperturaPremium.style.color = '#ffffff';
+                btnAperturaPremium.innerHTML = '🔒 Confirmar y Abrir Turno';
+                
+                const contenedorBotones = btnSalirNativo ? btnSalirNativo.parentElement : null;
+                if (contenedorBotones) {
+                    contenedorBotones.appendChild(btnAperturaPremium);
+                }
+            }
+                
+            btnAperturaPremium.onclick = () => {
+                const textoTotalContado = document.getElementById('cashcount-total')?.textContent || "$0.00";
+                const montoDeclaradoFondo = Number(textoTotalContado.replace(/[^0-9.-]+/g, "")) || 0;
+
+                if (montoDeclaradoFondo === 0) {
+                    if (!confirm("⚠️ ADVERTENCIA DE AUDITORÍA:\n¿Está completamente segura de abrir el turno con $0.00 de fondo de cambio en la gaveta?")) return;
+                }
+
+                const objetoFondoInicial = {
+                    usuario: aliasLimpio,
+                    estacion: estacionLimpia,
+                    fecha_registro: new Date().toISOString(),
+                    monto_fondo_real: montoDeclaradoFondo
+                };
+
+                localStorage.setItem(llaveFondoKey, JSON.stringify(objetoFondoInicial));
+                alert(`🎉 ¡Turno abierto con éxito total!\nFondo en Caja: $${montoDeclaradoFondo}.\nEl POS ha quedado desbloqueado para operar.`);
+	
+		    setTimeout(() => {
+        		window.location.reload();
+		    }, 100);
+            };
+
+            // Lanzamiento forzado responsivo de alta prioridad visual
+            console.log("🚀 [MeetFashion]: Forzando renderizado del modal retirando .hidden e inyectando display:flex");
+            modalCashcount.classList.remove('hidden');
+            modalCashcount.style.display = 'flex';
+            
+            if (typeof renderDenoms === 'function') {
+                console.log("🚀 [MeetFashion]: Invocando función nativa renderDenoms()");
+                renderDenoms();
+            } else if (typeof initCashCount === 'function') {
+                console.log("🚀 [MeetFashion]: Invocando función nativa initCashCount()");
+                initCashCount();
+            }
+        } else {
+            console.error("❌ [MeetFashion] CRÍTICO: No se localizó el elemento #modal-cashcount en el HTML.");
+        }
+    } else {
+        console.log("✓ [MeetFashion]: Caja YA inicializada previamente. Permitiendo operación regular en mostrador.");
+    }
+}
+
+// Enlazamos la ejecución al arranque automático del documento de ventas
+document.addEventListener('DOMContentLoaded', () => {
+    // Esperamos 100 milisegundos para asegurar que tus scripts nativos terminen de dibujar el POS antes de evaluar el bloqueo
+    setTimeout(validarBloqueoAperturaCaja, 100);
+});
+
+
+
 document.getElementById('btn-users').addEventListener('click', (ev)=> {
   ev.preventDefault();
   window.location.href = 'users.html';
 });
 
 // ====================================================================
-// 🔥 LOGICA CENTRALIZADA DE CONSECUTIVOS DE ALTA FIDELIDAD (FIX #000139)
+// 🔥 LOGICA CENTRALIZADA DE CONSECUTIVOS DE ALTA FIDELIDAD
 // ====================================================================
 function setUserContext(user){
   currentUser = user;
   sessionStorage.setItem('pos_user', JSON.stringify(user));
   sessionStorage.setItem('pos_cashier', user.user);
   
-  // Conteo automático e inmune a desfases para el inicio de sesión
-  const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
-  const seqContexto = ventasFisicasRaw.length + 1;
-
-  sessionStorage.setItem('pos_ticket_seq', seqContexto.toString());
+  // Conteo real de renglones del disco al inicializar sesión
+  const listaVentasHistorial = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+  const seqContexto = listaVentasHistorial.length + 1;
+  
   ticketSeq = seqContexto;
+  sessionStorage.setItem('pos_ticket_seq', seqContexto.toString());
 
   if(el.cashierSpan) el.cashierSpan.textContent = `Usuario: ${user.user}`;
   if(el.ticketNum) el.ticketNum.textContent = `Ticket: #${String(seqContexto).padStart(6,'0')}`;
   if(el.stationSpan) el.stationSpan.textContent = `Estación: ${user.station || 'Principal'}`;
   if(el.turnoSpan) el.turnoSpan.textContent  =  `Turno: ${user.turno  ||  '—'}`;
 }
-
 
 function actualizarTicketDisplay() {
     // Sincronizamos la misma lógica para cuando se refresca la botonera
@@ -141,15 +308,15 @@ function recalc(){
   let subtotal = cart.reduce((s,it)=> s + it.precio * it.qty, 0);
   if (el.total) el.total.textContent = fmtMX(subtotal);
   
-  // 🔍 DETERMINACIÓN REAL ABSOLUTA AL RECALCULAR
-  const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
-  const seqSegura = ventasFisicasRaw.length + 1;
+  // 🎯 CALCULO COMPENSADO AL VUELO: Inmune a desfases o bloqueos asíncronos
+  const listaVentasHistorial = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+  const seqSegura = listaVentasHistorial.length + 1;
   
-  // Forzamos la nivelación de la variable global de tu sistema
+  // Nivelamos la variable global del sistema para que todo el archivo hable el mismo idioma
   ticketSeq = seqSegura;
   sessionStorage.setItem('pos_ticket_seq', seqSegura.toString());
 
-  // Inyectamos de forma obligatoria el número corregido en la pantalla superior
+  // Actualizamos la cabecera manteniendo de forma milimétrica tu formato original "Ticket: #000138"
   if (el.ticketNum) {
       el.ticketNum.textContent = `Ticket: #${String(seqSegura).padStart(6,'0')}`;
   }
@@ -158,22 +325,18 @@ function recalc(){
 }
 
 
-
-
 window.updateTicketNumber = function() {
-    // Si la función global se gatilla, lee la sesión fresca recalculada
-    const listaVentasReales = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
-    const seqReal = listaVentasReales.length + 1;
+    const listaVentasHistorial = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+    const seqReal = listaVentasHistorial.length + 1;
     
-    // Forzamos la persistencia en el sessionStorage para limpiar la memoria vieja
     sessionStorage.setItem("pos_ticket_seq", seqReal.toString());
 
     const label = document.getElementById("ticket-num");
     if (label) {
-        // Mantenemos el formato exacto de tu cabecera nativa "Ticket #000135"
         label.textContent = `Ticket #${String(seqReal).padStart(6, "0")}`;
     }
 };
+
 
 
 // Función para cargar las estaciones creadas por el Administrador en el Login
@@ -520,44 +683,118 @@ function actualizarPreview(producto) {
     else img.src = "logo.png";
 }
 
-// reprint search/preview/print
-el.reimpSearch && el.reimpSearch.addEventListener('click', ()=>{
-  const t = Number(el.reimpTicket.value);
-  if(!t) return alert('Ingresa ticket');
-  const sale = DB.getSaleByTicket(t);
-  if(!sale) { el.reimpPreview.innerHTML = 'No encontrado'; return; }
+// ====================================================================
+// 🧾 REPRINT SEARCH/PREVIEW/PRINT BLINDADO MEDIANTE MAPEO DE CAJERO
+// ====================================================================
+el.reimpSearch && el.reimpSearch.addEventListener('click', () => {
+    const t = Number(el.reimpTicket.value);
+    if (!t) return alert('Ingresa ticket');
 
-// === Generar HTML del ticket para impresión ===
-let html = `
-    <div class="ticket">
-        <h2 style="text-align:center">MEET FASHION</h2>
-        <div>${new Date(sale.fecha).toLocaleString()}</div>
-        <hr>
-        <div>
-`;
+    const previewContenedor = el.reimpPreview || document.getElementById('reimp-preview');
+    const botonImprimirReal = document.getElementById('reimp-print') || el.reimpPrint;
 
-(sale.items || []).forEach(it => {
-    const qty = it.cantidad || it.qty || 1;
+    // 🔒 1. BLOQUEO PREVENTIVO INMEDIATO EN EL MILISEGUNDO CERO
+    if (botonImprimirReal) {
+        botonImprimirReal.disabled = true;
+        botonImprimirReal.style.backgroundColor = '#cbd5e1'; // Gris apagado
+        botonImprimirReal.style.color = '#94a3b8';
+        botonImprimirReal.style.cursor = 'not-allowed';
+    }
+
+    const sale = DB.getSaleByTicket(t);
+    if (!sale) {
+        if (previewContenedor) previewContenedor.innerHTML = '<div style="color:#dc3545; font-weight:600; text-align:center; padding:10px;">❌ Ticket no encontrado</div>';
+        return;
+    }
+
+    // ====================================================================
+    // 🔥 MAPEO CRUZADO DE CAJERO CONTRA BASE DE DATOS DE USUARIOS (EL FIX)
+    // ====================================================================
+    // 1. Extraemos la estación de la sesión actual de la cajera en esta computadora
+    const sesionObj = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
+    const sucursalSesionActual = String(sesionObj.estacion || sesionObj.station || 'Salto del Agua').trim().toLowerCase();
+
+    // 2. Extraemos el nombre de la cajera que emitió el ticket consultado
+    const nombreCajeraTicket = sale.cashier || sale.usuario || '';
+
+    // 3. Cruzamos los datos yendo a buscar a esa cajera en el catálogo de usuarios
+    let sucursalTicketCalculada = '';
+    const listaUsuariosDB = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    const empleadoQueVendio = listaUsuariosDB.find(x => x.user === nombreCajeraTicket);
+
+    if (empleadoQueVendio) {
+        // Si el empleado existe en la base, extraemos sucursal actual asignada
+        sucursalTicketCalculada = String(empleadoQueVendio.estacion || empleadoQueVendio.station || '').trim().toLowerCase();
+    }
+
+    // Si por contingencia es una venta vieja sin cajero, hereda por defecto el valor nativo o la base
+    if (!sucursalTicketCalculada) {
+        sucursalTicketCalculada = String(sale.station || sale.estacion || 'salto del agua').trim().toLowerCase();
+    }
+
+    // ====================================================================
+    // 🎯 VALIDACIÓN DE INTEGRIDAD INTER-SUCURSAL BLINDADA
+    // ====================================================================
+    const coincidenEstaciones = (sucursalTicketCalculada === sucursalSesionActual) || 
+                                (sucursalTicketCalculada.length > 3 && sucursalSesionActual.includes(sucursalTicketCalculada)) || 
+                                (sucursalSesionActual.length > 3 && sucursalTicketCalculada.includes(sucursalSesionActual));
+
+    if (!coincidenEstaciones) {
+        // Buscamos el nombre estético original para mostrar en la alerta
+        const nombreEstacionTicketOriginal = empleadoQueVendio ? (empleadoQueVendio.estacion || empleadoQueVendio.station) : "otra sucursal";
+        
+        // Vaciamos la previsualización al instante antes de que corra la alerta bloqueante
+        if (previewContenedor) {
+            previewContenedor.innerHTML = `<div style="color:#ef4444; font-weight:600; font-size:12px; padding:15px; text-align:center; background:#fef2f2; border:1px solid #fee2e2; border-radius:6px; font-family:sans-serif;">🔒 Acceso Bloqueado: Este ticket pertenece a la estación "${nombreEstacionTicketOriginal}".</div>`;
+        }
+
+        alert(`⚠️ ACCESO RESTRINGIDO:\nEl ticket #${t} corresponde a la estación "${nombreEstacionTicketOriginal}".\nNo tienes permisos para consultar ni reimprimir folios de cajas ajenas.`);
+        return; // 🛑 CORTA LA OPERACIÓN DEFINITIVAMENTE
+    }
+
+    // ====================================================================
+    // 🛍️ RENDERIZADO DEL TICKET (Se ejecuta solo si es de tu sucursal)
+    // ====================================================================
+    let html = `
+        <div class="ticket">
+            <h2 style="text-align:center; margin:4px 0;">MEET FASHION</h2>
+            <div style="text-align:center; font-size:11px;">${new Date(sale.fecha).toLocaleString()}</div>
+            <hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;">
+            <div>
+    `;
+
+    (sale.items || []).forEach(it => {
+        const qty = it.cantidad || it.qty || 1;
+        html += `
+            <div style="display:flex;justify-content:space-between; margin-bottom:4px;">
+                <span>${it.nombre} x${qty}</span>
+                <span>${fmtMX((it.precio || 0) * qty)}</span>
+            </div>
+        `;
+    });
+
     html += `
-        <div style="display:flex;justify-content:space-between;">
-            <span>${it.nombre} x${qty}</span>
-            <span>${fmtMX((it.precio || 0) * qty)}</span>
+            </div>
+            <hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;">
+            <div>Total: ${fmtMX(sale.total || 0)}</div>
+            <div>Pagado: ${fmtMX(sale.pagado || 0)}</div>
+            <div>Cambio: ${fmtMX(sale.cambio || 0)}</div>
+            <hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;">
+            <div style="text-align:center; font-weight:600;">¡Gracias por su compra!</div>
         </div>
     `;
-});
 
-html += `
-        </div>
-        <hr>
-        <div>Total: ${fmtMX(sale.total || 0)}</div>
-        <div>Pagado: ${fmtMX(sale.pagado || 0)}</div>
-        <div>Cambio: ${fmtMX(sale.cambio || 0)}</div>
-        <hr>
-        <div style="text-align:center;">¡Gracias por su compra!</div>
-    </div>
-`;
+    if (previewContenedor) {
+        previewContenedor.innerHTML = html;
+    }
 
-  el.reimpPreview.innerHTML = html;
+    // 🔥 ACTIVACIÓN EXITOSA: Si superó los candados, el botón se enciende en azul brillante al final
+    if (botonImprimirReal) {
+        botonImprimirReal.disabled = false;
+        botonImprimirReal.style.backgroundColor = '#0066ff'; // Azul corporativo
+        botonImprimirReal.style.color = '#ffffff';
+        botonImprimirReal.style.cursor = 'pointer';
+    }
 
 	el.reimpPrint && el.reimpPrint.addEventListener('click', ()=>{
 	  const t = Number(el.reimpTicket.value); const sale = DB.getSaleByTicket(t);
@@ -573,6 +810,7 @@ html += `
 	el.reimpModal.classList.add('hidden')
 	});
 });
+
 el.reimpClose && el.reimpClose.addEventListener('click', ()=> el.reimpModal.classList.add('hidden'));
 
 // --- payments init (uses payments module init paid earlier) ---
@@ -751,13 +989,15 @@ renderCatalogModal(); el.modalCatalog && el.modalCatalog.classList.remove('hidde
 });
 
 
-//Conteo de efectivo
+// ====================================================================
+// 💵 MODAL CONTEO DE EFECTIVO
+// ====================================================================
 const denoms = [1000,500,200,100,50,20,10,5,2,1];
 const denomContainer = document.getElementById('denoms-list');
 if(denomContainer){
   denoms.forEach(v=>{
     const div = document.createElement('div');
-    div.innerHTML = `<label>$${v}</label><input class="denom-input" type="number" min="0" value="0" data-value="${v}">`;
+    div.innerHTML = `<label style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: #334155;">$${v}</label><input class="denom-input" type="number" min="0" value="0" data-value="${v}" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">`;
     denomContainer.appendChild(div);
   });
   function calcDenoms(){
@@ -782,24 +1022,134 @@ if(denomContainer){
 
 });
 
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-        const modal = document.getElementById("modal-cashcount");
-        if (modal && !modal.classList.contains("hidden")) {
-            // Cerrar modal
-            modal.classList.add("hidden");
+// ====================================================================
+// 🔒 FUNCIÓN DE ARQUEO
+// ====================================================================
+function inicializarCalculosReactivosNuevoArqueo() {
+    const denominacionesArqueo = [
+        { id: 'arq-b1000', valor: 1000 }, { id: 'arq-b500',  valor: 500 },
+        { id: 'arq-b200',  valor: 200 },  { id: 'arq-b100',  valor: 100 },
+        { id: 'arq-b50',   valor: 50 },   { id: 'arq-m20',   valor: 20 },
+        { id: 'arq-m10',   valor: 10 },   { id: 'arq-m5',    valor: 5 },
+        { id: 'arq-m2',    valor: 2 },    { id: 'arq-m1',    valor: 1 }
+    ];
 
-            // Reiniciar inputs
-            const denomContainer = document.getElementById("denoms-list");
-            denomContainer?.querySelectorAll(".denom-input").forEach(input => {
-                input.value = 0;
-            });
+    function ejecutarSumaArqueoCiegas() {
+        let granTotalArqueo = 0;
 
-            // Reiniciar total mostrado
-            const totalDisplay = document.getElementById("cashcount-total");
-            if (totalDisplay) totalDisplay.textContent = fmtMX(0);
+        denominacionesArqueo.forEach(item => {
+            const inputElement = document.getElementById(item.id);
+            if (inputElement) {
+                granTotalArqueo += (Number(inputElement.value) || 0) * item.valor;
+            }
+        });
+
+        // Inyectamos el total en tu visor de la tarjeta
+        const visorTotalArqueo = document.getElementById('arqueo-ciegas-total');
+        if (visorTotalArqueo) {
+            visorTotalArqueo.textContent = typeof fmtMX !== 'undefined' 
+                ? fmtMX(granTotalArqueo) 
+                : '$' + granTotalArqueo.toFixed(2);
         }
-	
+
+        // ====================================================================
+        // 🎯 EL FIX: ACTIVACIÓN Y DESBLOQUEO EXCLUSIVO POR ID NATIVO
+        // ====================================================================
+        const btnConfirmarArqueo = document.getElementById('btn-arqueo-confirmar-corte');
+        
+        if (btnConfirmarArqueo) {
+            if (granTotalArqueo > 0) {
+                // 1. Desbloqueo nativo del botón en el navegador
+                btnConfirmarArqueo.removeAttribute('disabled');
+                btnConfirmarArqueo.disabled = false;
+                
+                // 2. 🔥 LIBERACIÓN EN LÍNEA: Vaciamos las propiedades rígidas de CSS
+                btnConfirmarArqueo.style.pointerEvents = ""; // <-- ¡ESTO ES LO QUE LE DEVUELVE EL CLIC!
+                btnConfirmarArqueo.style.cursor = "pointer";
+                
+                // 3. Estilos visuales de tu azul de alta visibilidad
+                btnConfirmarArqueo.style.backgroundColor = '#0066ff';
+                btnConfirmarArqueo.style.color = '#ffffff';
+                btnConfirmarArqueo.style.opacity = '1';
+                btnConfirmarArqueo.style.boxShadow = '0 4px 12px rgba(0, 102, 255, 0.2)';
+            } else {
+                // ❄️ RE-CONGELAMIENTO EN CEROS
+                btnConfirmarArqueo.setAttribute('disabled', 'true');
+                btnConfirmarArqueo.disabled = true;
+                
+                btnConfirmarArqueo.style.pointerEvents = "none"; // Congela físicamente el mouse
+                btnConfirmarArqueo.style.cursor = "not-allowed";
+                btnConfirmarArqueo.style.backgroundColor = '#cbd5e1';
+                btnConfirmarArqueo.style.color = '#94a3b8';
+                btnConfirmarArqueo.style.boxShadow = 'none';
+            }
+        }
+
+
+        sessionStorage.setItem('monto_fisico_contado_arqueo_ciegas', granTotalArqueo);
+    }
+
+    // Vinculamos la reactividad a las casillas al teclear números
+    const casillasArqueo = document.querySelectorAll('.input-arqueo-val');
+    casillasArqueo.forEach(input => {
+        input.removeEventListener('input', ejecutarSumaArqueoCiegas);
+        input.addEventListener('input', ejecutarSumaArqueoCiegas);
+    });
+
+    ejecutarSumaArqueoCiegas();
+
+// ====================================================================
+// 🚪 PASO 2.1: ACTIVACIÓN REAL Y DESBLOQUEO DEL BOTÓN "SALIR" DE ARQUEO
+// ====================================================================
+const btnSalirArqueo = document.getElementById('btn-arqueo-cancelar');
+
+if (btnSalirArqueo) {
+    // 🔥 LIBERACIÓN EN LÍNEA: Forzamos la remoción de cualquier bloqueo previo de mouse
+    btnSalirArqueo.style.pointerEvents = ""; 
+    btnSalirArqueo.style.cursor = "pointer";
+    btnSalirArqueo.disabled = false;
+
+    // 🎯 ASOCIACIÓN DEL EVENTO CLIC: Cierre limpio y reversión de candados
+    btnSalirArqueo.onclick = () => {
+        // 1. Ocultamos el nuevo modal de arqueo de forma segura
+        const modalArqueoNuevo = document.getElementById('modal-arqueo-ciegas');
+        if (modalArqueoNuevo) {
+            modalArqueoNuevo.classList.add('hidden');
+            modalArqueoNuevo.style.display = 'none';
+        }
+
+        // 2. REVERSIÓN DE SEGURIDAD: Le devolvemos la interacción a tu barra superior azul
+        // para que la vendedora pueda seguir cobrando o navegando si decidió no cerrar la caja
+
+        const btnHeaderCatalogo = document.getElementById('btn-catalogo');
+        const btnHeaderCobrar = document.getElementById('btn-cobrar');
+        const btnHeaderConteo   = document.getElementById('btn-cashcount');
+        const btnHeaderCorte    = document.getElementById('btn-corte');
+        const btnHeaderReimpTicket    = document.getElementById('btn-reprint');
+        const btnHeaderLogout    = document.getElementById('btn-logout');
+
+        const buscadorVentas    = document.getElementById('search-input');
+
+        if (buscadorVentas) buscadorVentas.disabled = false;
+
+        const botoneraHeader = [btnHeaderCatalogo, btnHeaderCobrar, btnHeaderConteo, btnHeaderCorte, btnHeaderReimpTicket, btnHeaderLogout];
+        botoneraHeader.forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.cursor = "";
+                btn.style.opacity = "";
+                btn.style.pointerEvents = ""; // Libera los clics fijos del POS
+            }
+        });
+            limpiarFormularioModalArqueo();
+    };
+}
+
+}
+
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {	
 	const modalPay = document.getElementById("modal-payment");
         if (modalPay && !modalPay.classList.contains("hidden")) {
             // Cerrar modal
@@ -898,219 +1248,631 @@ const html  =  `
  });
 }
 
+// ====================================================================
 //  Helpers  para  el  corte  por  periodos
-function  getLastCutISO()  {
-    return  sessionStorage.getItem('pos_last_cut') ||  null;
+// ====================================================================
+function getLastCutISO() {
+    const sesionObj = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
+    const estacionLimpia = String(sesionObj.estacion || sesionObj.station || 'Principal').trim().replace(/\s+/g, '_');
+    
+    // Guarda llaves independientes como: "last_cut_date_Centro_Medico" o "last_cut_date_Chabacano_Linea_Cafe"
+    return localStorage.getItem(`last_cut_date_${estacionLimpia}`);
 }
-function  setLastCutISO(iso)  {
-    sessionStorage.setItem('pos_last_cut',  iso);
+
+function setLastCutISO(isoString) {
+    const sesionObj = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
+    const estacionLimpia = String(sesionObj.estacion || sesionObj.station || 'Principal').trim().replace(/\s+/g, '_');
+    
+    localStorage.setItem(`last_cut_date_${estacionLimpia}`, isoString);
 }
 
-document.getElementById('btn-corte')?.addEventListener('click',  ()  =>  {
-    document.getElementById('modal-corte').classList.remove('hidden');
+// ====================================================================
+// 🧹 FUNCIÓN DE PURGA: LIMPIEZA ABSOLUTA DEL MODAL DE ARQUEO A CEROS
+// ====================================================================
+function limpiarFormularioModalArqueo() {
+    const idsCasillas = [
+        'arq-b1000', 'arq-b500', 'arq-b200', 'arq-b100', 'arq-b50',
+        'arq-m20', 'arq-m10', 'arq-m5', 'arq-m2', 'arq-m1'
+    ];
 
-    const onYes = () => {
-    document.getElementById('modal-corte').classList.add('hidden');
-    const  cashierId  =  sessionStorage.getItem('pos_cashier');
-    const  now =  new  Date();
-
-    //  Desde:  el  último  corte;  si  no  existe,  inicio  del  día
-    const  lastCutISO  =  getLastCutISO();
-    const  desde  =  lastCutISO  ?  new  Date(lastCutISO)  :  new  Date(new  Date().setHours(0,0,0,0));
-    const  hasta  = now;
-
-    //  Filtrar  ventas  del  cajero  en  el  rango  [desde,  hasta]
-    const  ventasPeriodo  =  DB.getSales().filter(v  =>  {
-        const  f  =  new  Date(v.fecha);
-        return  f  >=  desde  &&  f <=  hasta  &&  v.cashier  ===  cashierId;
+    // 1. Ponemos el valor de cada input de billetes estrictamente en 0
+    idsCasillas.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = 0;
     });
 
- //  Totales  (mantén tu  lógica  de  artículos y  agrega  los  acumuladores de  pagos/ingresos)
- let  totalCash =  0,  totalCard  = 0,  totalTransfer  =  0, totalIngresos  =  0;
- const articleMap  =  {};
- 
-//  1)  Acumula  totales por  método  y  total de  ventas
- ventasPeriodo.forEach(v  => {
-     totalCash          +=  v.payments?.efectivo          ||  0;
-    totalCard           +=  v.payments?.tarjeta            ||  0;
-    totalTransfer   +=  v.payments?.transferencia  ||  0;
-    totalIngresos   +=  v.total                                   ||  0;
- });
+    // 2. Restablecemos el texto del visor negro a su estado inicial
+    const visorTotal = document.getElementById('arqueo-ciegas-total');
+    if (visorTotal) visorTotal.textContent = "$0.00";
 
- //  2)  Mantén tu  cálculo  de  artículos tal  cual  (no  lo muevas  ni  lo  mezcles)
-ventasPeriodo.forEach(v  =>  {
-    (v.items  ||  []).forEach(it =>  {
-        const  qty     =  it.cantidad ||  it.qty  ||  1;
-       const  price  =  it.precio     ||  0;
-       const  key     =  `${it.codigo}|${it.nombre}`;
-        if  (!articleMap[key]) articleMap[key]  =  {  nombre: it.nombre,  qty:  0,  monto: 0  };
-        articleMap[key].qty     +=  qty;
-        articleMap[key].monto +=  price  *  qty;
-    });
- });
-
-
-
-       const  corte  =  {
-              fecha: new  Date().toLocaleString("sv-SE"),
-               usuario: currentUser?.user  ||  '—',
-               estacion: currentUser?.station  ||  '—',
-               turno:  currentUser?.turno ||  '—',
-               tickets: ventasPeriodo.length,
-               totalCash,
-               totalCard,
-               totalTransfer,
-               totalIngresos,
-               articulos:  articleMap
-       };
-
-       DB.saveCut(corte);
-       setLastCutISO(now.toISOString());
-
-    //  Construir  HTML  del  corte
-    let  html  =  `<div  style="padding:12px">
-        <h2>Corte  -  ${now.toLocaleString()}</h2>
-        <div>Estación:  ${sessionStorage.getItem('estacion-activa')}</div>
-        <div>Usuario	:  ${cashierId}</div>
-        <div>Turno:  ${currentUser?.turno  || '—'}</div>
-        <div>Periodo:  ${desde.toLocaleString()}  →  ${hasta.toLocaleString()}</div>
-        <hr>
-        <div>Efectivo:  ${fmtMX(totalCash)}</div>
-        <div>Tarjeta:  ${fmtMX(totalCard)}</div>
-        <div>Transferencia:  ${fmtMX(totalTransfer)}</div>
-        <hr>
-        <div>Total  de  venta:  ${fmtMX(totalIngresos)}</div>
-    `;
-
-    if  (ventasPeriodo.length  >  0)  {
-        html  +=  `<hr><h4>Artículos  vendidos</h4><div>`;
-        Object.values(articleMap).forEach(a =>  {
-            html  +=  `<div>${a.nombre}  —  ${a.qty}  —  ${fmtMX(a.monto)}</div>`;
-        });
-        html  +=  `</div><hr><div>Clientes  atendidos  (tickets):  ${ventasPeriodo.length}</div>`;
-    }  else  {
-        html  += `<hr><div>Sin  ventas  en  el  periodo.</div>`;
+    // 3. Volvemos a congelar el botón azul en gris preventivo para que no pase vacío
+    const btnConfirmar = document.getElementById('btn-arqueo-confirmar-corte');
+    if (btnConfirmar) {
+        btnConfirmar.setAttribute('disabled', 'true');
+        btnConfirmar.disabled = true;
+        btnConfirmar.style.backgroundColor = '#cbd5e1';
+        btnConfirmar.style.color = '#94a3b8';
+        btnConfirmar.style.cursor = 'not-allowed';
+        btnConfirmar.style.boxShadow = 'none';
     }
-    html  +=  `</div>`;
+}
 
-    //  Pintar  en  preview  (sobre  producto-preview)
-    const  preview  =  document.getElementById('producto-preview');
-    if  (preview)  {
-        preview.innerHTML  =  html;
-       preview.style.overflow  =  'auto';
-        preview.style.padding  =  '12px';
-        preview.style.background  =  '#fff';
-        preview.style.border  =  '1px  solid  #eee';
+
+
+// ====================================================================
+// 🏪 SISTEMA DE CORTES PERIMETRALES POR ESTACIÓN REAL (BLINDAJE TOTAL)
+// ====================================================================
+document.getElementById('btn-corte')?.addEventListener('click', () => {
+
+    const sesionActiva = JSON.parse(sessionStorage.getItem('pos_user'));
+    const cashierId = sessionStorage.getItem('pos_cashier');
+
+    if (!sesionActiva) return;
+
+    // 1. INMUNIDAD AUTOMÁTICA DE PRIVILEGIOS (ROLES MASTER / ADMIN)
+    const rolActual = String(sesionActiva.role || sesionActiva.rol || 'vendedor').toLowerCase();
+    const esMaestro = rolActual === 'master';
+
+    // 👑 Si es el dueño o administrador, se brinca el arqueo a ciegas y abre directo tu confirmación nativa vieja
+    if (esMaestro) {
+
+        console.log("MeetFashion: Acceso Máster. Inmunidad de apertura concedida."); 
+        return;
     }
-const  printCorte =  document.getElementById('modal-print-corte');
 
-    //  Imprimir
-   if(printCorte) {
-    printCorte.classList.remove('hidden');
-    const onYes = () => {
+    // 2. 🎯 CANDADO PERIMETRAL DE AUDITORÍA: BLOQUEO TOTAL DE BOTONES
+    // Localizamos absolutamente todos los controles de la barra superior azul
+    const buscadorVentas = document.getElementById('search-input');
 
-        if  (typeof  window.printTicketHTML  ===  'function')  {
-            window.printTicketHTML(html);
-        }  else  {
-            const  w  =  window.open('', '_blank');
-            w.document.write(html);
-            w.document.close();
-            w.print();
-            w.close();
+    // Congelamos el input de código de barras para que no metan más mercancía
+    if (buscadorVentas) {
+        buscadorVentas.disabled = true;
+    }
+
+        // 🎯 EL NUEVO CANDADO ABSOLUTO PARA LOS BOTONES DEL HEADER:
+        // Localizamos tus botones superiores por las etiquetas y textos nativos de tu barra azul
+        const btnHeaderCatalogo = document.getElementById('btn-catalogo');
+        const btnHeaderCobrar = document.getElementById('btn-cobrar');
+        const btnHeaderConteo   = document.getElementById('btn-cashcount');
+        const btnHeaderCorte    = document.getElementById('btn-corte');
+        const btnHeaderReimpTicket    = document.getElementById('btn-reprint');
+        const btnHeaderLogout    = document.getElementById('btn-logout');
+
+        // Congelamos en masa los accesos superiores para evitar intrusiones visuales
+        const botonesBloquear = [btnHeaderCatalogo, btnHeaderCobrar, btnHeaderConteo, btnHeaderCorte, btnHeaderReimpTicket, btnHeaderLogout];
+        
+
+    // 🔒 INHABILITACIÓN ABSOLUTA (INCLUYE CERRAR SESIÓN)
+    // El script recorre la botonera superior, apaga los clics y baja la opacidad en masa
+    botonesBloquear.forEach(btn => {
+        if (btn) {
+            btn.disabled = true;
+            btn.style.cursor = "not-allowed";
+            btn.style.opacity = "0.4";
+            btn.style.pointerEvents = "none"; // Elimina cualquier acción de clic en el navegador
         }
-    printCorte.classList.add('hidden');
-    }
+    });
 
-	//IMPRIMIR CONFIRMA QUE NO
+    // 3. 🎯 ARRANQUE DINÁMICO DE TU NUEVO MODAL DE ARQUEO INDEPENDIENTE
+    const modalArqueoNuevo = document.getElementById('modal-arqueo-ciegas');
+    if (modalArqueoNuevo) {
+        // Removemos tu clase hidden nativa para traerlo al frente de la pantalla
+        modalArqueoNuevo.classList.remove('hidden');
+        modalArqueoNuevo.style.display = 'flex'; // Forzamos el centrado flexible de la tarjeta
+        
+        // Inicializamos los escuchadores interactivos para las monedas de esta nueva caja
+        inicializarCalculosReactivosNuevoArqueo();
+    }
+});
+
+// ====================================================================
+// 🏪 CONFIRMAR CORTE DE CAJA
+// ====================================================================
+document.getElementById('btn-arqueo-confirmar-corte')?.addEventListener('click', () => {
+
+        // 🎯 LECTURA PREVENTIVA PRE-PURGA: Capturamos los datos del modal mientras siguen vivos en pantalla
+        const textoVisorArqueo = document.getElementById('arqueo-ciegas-total')?.textContent || "$0.00";
+        // Congelamos el número que el vendedor tecleó físicamente en la modal
+        const granTotalEfectivoContadoReal = Number(textoVisorArqueo.replace(/[^0-9.-]+/g, "")) || 0;
+
+        // Extraemos la estación exacta respetando mayúsculas y minúsculas directamente desde tu sesión activa
+        const sesionActivaObj = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
+        const estacionFondoTicket = String(sesionActivaObj.estacion || sesionActivaObj.station || 'Centro Medico').trim();
+        const aliasFondoTicket = String(sessionStorage.getItem('pos_cashier') || '').trim().toLowerCase();
+
+        // Jalamos el fondo inicial real usando la llave exacta combinada
+        const jsonFondoTicket = localStorage.getItem(`fondo_apertura_${aliasFondoTicket}_${estacionFondoTicket.toLowerCase()}`);
+        const fondoInicialTicketReal = jsonFondoTicket ? Number(JSON.parse(jsonFondoTicket).monto_fondo_real) : 1000;
+
+        // Almacenamos temporalmente en el objeto global de la ventana para que el Bloque 2 lo lea limpio
+        window.montoFisicoContadoSnapshot = granTotalEfectivoContadoReal;
+        window.montoFondoInicialSnapshot = fondoInicialTicketReal;
+
+
+        const modalArqueoNuevo = document.getElementById('modal-arqueo-ciegas');
+        
+        if (modalArqueoNuevo) {
+            // 🔥 EL FIX MAESTRO: Apagamos el estilo en línea y añadimos tu clase nativa
+            // Esto destruye cualquier persistencia visual en el navegador de inmediato
+            modalArqueoNuevo.style.display = "none"; 
+            modalArqueoNuevo.classList.add('hidden');
+        }
+
+        // 2. REVERSIÓN DE BOTONES: Devolvemos la vida a los controles generales
+        // para que tu modal nativo de "¿Ejecutar corte?" reciba los clics sin trabas
+        document.querySelectorAll('button').forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.cursor = "";
+                btn.style.opacity = "";
+                btn.style.pointerEvents = "auto";
+            }
+        });
+
+        // 2. REVERSIÓN DE SEGURIDAD: Le devolvemos la interacción a tu barra superior azul
+        // para que la vendedora pueda seguir cobrando o navegando si decidió no cerrar la caja
+
+        const btnHeaderCatalogo = document.getElementById('btn-catalogo');
+        const btnHeaderCobrar = document.getElementById('btn-cobrar');
+        const btnHeaderConteo   = document.getElementById('btn-cashcount');
+        const btnHeaderCorte    = document.getElementById('btn-corte');
+        const btnHeaderReimpTicket    = document.getElementById('btn-reprint');
+        const btnHeaderLogout    = document.getElementById('btn-logout');
+
+        const buscadorVentas    = document.getElementById('search-input');
+
+        if (buscadorVentas) buscadorVentas.disabled = false;
+
+        const botoneraHeader = [btnHeaderCatalogo, btnHeaderCobrar, btnHeaderConteo, btnHeaderCorte, btnHeaderReimpTicket, btnHeaderLogout];
+        botoneraHeader.forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.cursor = "";
+                btn.style.opacity = "";
+                btn.style.pointerEvents = ""; // Libera los clics fijos del POS
+            }
+        });
+
+
+
+        const cashierId = sessionStorage.getItem('pos_cashier');
+        const now = new Date();
+
+        // Desde: el último corte; si no existe, inicio del día
+        const lastCutISO = getLastCutISO();
+        const desde = lastCutISO ? new Date(lastCutISO) : new Date(new Date().setHours(0,0,0,0));
+        const hasta = now;
+
+        // ====================================================================
+        // 🔥 VARIABLES UNIFICADAS: Extracción segura de la sesión activa
+        // ====================================================================
+        const sucursalSesionActual = String(sesionActivaObj.estacion || sesionActivaObj.station || 'Salto del Agua').trim().toLowerCase();
+
+        // 🔥 FILTRADO CRÍTICO DE ALTA FIDELIDAD SIN ERRORES DE VARIABLE
+        const ventasPeriodo = DB.getSales().filter(v => {
+            const f = new Date(v.fecha);
+            
+            // 1. Validación básica de tiempo y cajero
+            const cumpleBasicos = f >= desde && f <= hasta && v.cashier === cashierId;
+            if (!cumpleBasicos) return false;
+
+            // 2. Extracción y cruce de la estación del ticket o perfil para amarrar la sucursal
+            let sucursalTicketCalculada = String(v.station || v.estacion || '').trim().toLowerCase();
+            
+            // Si la venta individual no tiene grabada la estación (contingencia), la cruzamos contra el catálogo de usuarios
+            if (!sucursalTicketCalculada) {
+                const listaUsuariosDB = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+                const empleado = listaUsuariosDB.find(x => x.user === v.cashier);
+                sucursalTicketCalculada = empleado ? String(empleado.estacion || empleado.station).trim().toLowerCase() : sucursalSesionActual;
+            }
+
+            // 🎯 COMPARACIÓN UNIFICADA PERFECTA: El ticket entra al corte si coincide con tu terminal de sesión
+            return sucursalTicketCalculada === sucursalSesionActual;
+        });
+
+        // ====================================================================
+        // 🔥 ACUMULADORES MULTICANAL CON CÁLCULO DE CAMBIO INTEGRADO
+        // ====================================================================
+        let totalCashBruto = 0, totalCard = 0, totalTransfer = 0, totalIngresos = 0;
+        let totalCambioEntregado = 0; // Acumulador dinámico de cambios entregados
+        const articleMap = {};
+ 
+        // 1) Acumula totales por método, total de ventas y deduce el cambio al vuelo
+        ventasPeriodo.forEach(v => {
+            const efec   = Number(v.payments?.efectivo || 0);
+            const tarj   = Number(v.payments?.tarjeta || 0);
+            const transf = Number(v.payments?.transferencia || 0);
+            const total  = Number(v.total || v.monto || 0);
+
+            totalCashBruto += efec;
+            totalCard      += tarj;
+            totalTransfer  += transf;
+            totalIngresos  += total;
+
+            // DEDUCCIÓN MULTICANAL AL VUELO: Si lo ingresado supera el costo de la nota, hubo cambio en efectivo
+            let cambioTicket = (efec + tarj + transf) - total;
+            if (cambioTicket > 0) {
+                totalCambioEntregado += cambioTicket;
+            }
+        });
+
+        // 🎯 BALANCE CONTABLE FINAL: El efectivo neto real es el recibido menos el cambio entregado
+        const efectivoNetoRealCaja = totalCashBruto - totalCambioEntregado;
+
+        // 2) Mantén tu cálculo de artículos tal cual (No se mueve ni se mezcla)
+        ventasPeriodo.forEach(v => {
+            (v.items || []).forEach(it => {
+                const qty   = it.cantidad || it.qty || 1;
+                const price = it.precio     || 0;
+                const key   = `${it.codigo}|${it.nombre}`;
+                if (!articleMap[key]) articleMap[key] = { nombre: it.nombre, qty: 0, monto: 0 };
+                articleMap[key].qty     += qty;
+                articleMap[key].monto   += price * qty;
+            });
+        });
+
+        // 3. Estructuramos el objeto del corte restando el cambio e inyectando las nuevas propiedades
+        const corte = {
+            fecha: new Date().toLocaleString("sv-SE"),
+            usuario: currentUser?.user || cashierId || '—',
+            estacion: currentUser?.estacion || currentUser?.station || 'Salto del Agua',
+            turno: currentUser?.turno || '—',
+            tickets: ventasPeriodo.length,
+            totalCash: efectivoNetoRealCaja, // Se guarda el efectivo NETO real en la base de datos
+            totalCambio: totalCambioEntregado, // Guardamos el cambio de auditoría
+            totalCard,
+            totalTransfer,
+            totalIngresos,
+            articulos: articleMap
+        };
+
+        DB.saveCut(corte);
+        setLastCutISO(now.toISOString());
+
+        // ====================================================================
+        // 🔒 FIX: CONGELAMIENTO PERIMETRAL POST-CORTE INMEDIATO (ANTI-INTRUSIÓN)
+        // Evita que la cajera abra catálogos mientras el ticket de corte está visible
+        // ====================================================================
+        const topbarRightContainer = document.querySelector('.topbar-right');
+        if (topbarRightContainer) {
+            // Inmovilizamos por completo todo el bloque derecho superior de tu mostrador
+            topbarRightContainer.style.pointerEvents = "none"; 
+            topbarRightContainer.style.opacity = "0.4"; // Se atenúa visualmente indicando cierre
+        }
+
+        // Liberamos única y exclusivamente el botón de Cerrar Sesión para salir seguro
+        const btnHeaderLogoutVal = document.getElementById('btn-logout');
+        if (btnHeaderLogoutVal) {
+            btnHeaderLogoutVal.style.pointerEvents = "auto";
+            btnHeaderLogoutVal.style.opacity = "1";
+            btnHeaderLogoutVal.style.cursor = "pointer";
+        }
+
+        // Activamos de inmediato el escudo contra los atajos físicos del teclado (F2 y F5)
+        window.bloqueoTecladoTurnoActivo = true;
+       
+        // ====================================================================
+        // 🔒 LA PURGA RADICAL DEL LOCALSTORAGE CORREGIDA CON TUS VARIABLES REALES
+        // Normalizamos tus variables exactas para dar con la llave en minúsculas
+        // ====================================================================
+        const usuarioLimpioCorte  = String(cashierId || '').trim().toLowerCase();
+        const sucursalLimpiaCorte = String(sucursalSesionActual || '').trim().toLowerCase();
+
+        // Construimos la plantilla de texto idéntica sin variables huérfanas
+        const llaveFondoAPurgar = `fondo_apertura_${usuarioLimpioCorte}_${sucursalLimpiaCorte}`;
+        
+        // Destruimos el candado de la base de datos local al vuelo
+        localStorage.removeItem(llaveFondoAPurgar);
+        sessionStorage.removeItem('monto_fisico_contado_arqueo_ciegas');
+        
+        console.log(`🧹 [MeetFashion]: Llave de apertura eliminada con éxito: ${llaveFondoAPurgar}`);
+
+        // ====================================================================
+        // 🧾 CONSTRUIR HTML DEL TICKET TÉRMICO CON FILA DE CAMBIO INYECTADA
+        // ====================================================================
+        // ====================================================================
+        // 🧾 CONSTRUIR HTML DEL TICKET TÉRMICO CON HOJA DE ESTILOS @MEDIA PRINT
+        // Rompe los scrolls de pantalla para estirar el papel térmico de forma continua
+        // ====================================================================
+                // ====================================================================
+                // 📊 BLOQUE 2: CONSUMO DE SNAPSHOT DE AUDITORÍA SIN PERSISTENCIA
+                // ====================================================================
+                const granTotalEfectivoContado = window.montoFisicoContadoSnapshot || 0;
+
+                // Dinero que el sistema esperaba físicamente en la gaveta
+                const efectivoEsperadoSistema = fondoInicialTicketReal + efectivoNetoRealCaja;
+                const diferenciaDescuadreFinal = granTotalEfectivoContado - efectivoEsperadoSistema;
+
+                // Anexamos las propiedades al objeto corte para que se graben solas en tu base de datos de reportes
+                corte.fondo_inicial = fondoInicialTicketReal;
+                corte.ventas_sistema = efectivoNetoRealCaja;
+                corte.get_efectivo_contado = granTotalEfectivoContado;
+                corte.diferencia = diferenciaDescuadreFinal;
+
+                // Calculamos el gran total del corte sumando las ventas globales del turno más el fondo de cambio
+                const granTotalAcumuladoCaja = totalIngresos + fondoInicialTicketReal;
+
+		let textoDiferenciaDinámica = "";
+		let colorDiferenciaDinámica = "#16a34a"; // Verde por defecto
+
+		if (diferenciaDescuadreFinal === 0) {
+		    textoDiferenciaDinámica = "CUADRADO";
+		} else if (diferenciaDescuadreFinal > 0) {
+		    // Si es dinero de más, forzamos el color verde y le inyectamos el símbolo "+"
+		    colorDiferenciaDinámica = "#16a34a";
+		    textoDiferenciaDinámica = "+" + fmtMX(diferenciaDescuadreFinal);
+		} else {
+		    // Si es dinero de menos (negativo), cambia a rojo de advertencia
+		    colorDiferenciaDinámica = "#dc2626";
+		    textoDiferenciaDinámica = fmtMX(diferenciaDescuadreFinal); // Ya incluye el signo "-" nativo
+		}
+
+     let html = `
+        <!-- 🔥 BLOQUE DE INTELIGENCIA DE IMPRESIÓN TERMICA -->
+        <style>
+            @media print {
+                body, html { background: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+                .ticket-thermal-wrapper { display: block !important; height: auto !important; max-height: none !important; padding: 0 !important; }
+                .seccion-articulos-scroll { overflow-y: visible !important; max-height: none !important; height: auto !important; border: none !important; }
+                .bloque-auditoria-bg { background: #ffffff !important; border: 1px dashed #cbd5e1 !important; }
+                .total-venta-badge { background: #ffffff !important; border: 2px solid #000000 !important; color: #000000 !important; }
+            }
+        </style>
+
+        <div class="ticket-thermal-wrapper" style="width: 100%; display: flex; flex-direction: column; height: 100%; max-height: 85vh; padding: 4px; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1e293b; box-sizing: border-box;">
+            
+            <!-- 📁 PARTE RECTILÍNEA SUPERIOR FIJA: Información del Turno y Métodos de Pago -->
+            <div style="flex-shrink: 0; background: #ffffff; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; margin-bottom: 10px;">
+                
+                <!-- 🏢 ENCABEZADO CORPORATIVO -->
+          <div style="text-align: center; margin-bottom: 12px; width: 100%; box-sizing: border-box;">
+                    <!-- Título de la Marca Principal -->
+                    <h2 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; text-transform: uppercase;">MEET FASHION</h2>
+                    
+                    <!-- 🎯 EL FIX MAESTRO EN UNA SOLA LÍNEA DE ALTA FIDELIDAD -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 0 2px;">
+                        
+                        <!-- Insignia Azul Imantada Perfectamente a la Izquierda -->
+                        <span style="background: #e0f2fe; color: #0369a1; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; margin: 0;">
+                            Corte de Caja
+                        </span>
+                        
+                        <!-- Fecha y Hora Imantada Perfectamente a la Derecha -->
+                        <span style="font-size: 11px; color: #64748b; font-weight: 500; white-space: nowrap; text-align: right; margin: 0;">
+                            ${now.toLocaleString()}
+                        </span>
+
+                    </div>
+                </div>
+
+                <!-- 📊 BLOQUE DE AUDITORÍA INFORMATIVO -->
+                <div class="bloque-auditoria-bg" style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between;"><span style="color: #64748b; font-weight: 500;">Estación:</span> <strong style="color: #0f172a;">${corte.estacion}</strong></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: #64748b; font-weight: 500;">Usuario:</span> <span style="font-weight: 600;">${cashierId}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: #64748b; font-weight: 500;">Turno:</span> <span style="text-transform: capitalize; font-weight: 600;">${corte.turno}</span></div>
+                    <hr style="border: none; border-top: 1px dashed #cbd5e1; margin: 3px 0;">
+                    <div style="font-size: 10px; color: #64748b; text-align: center; font-weight: 500; line-height: 1.3;">Periodo: ${desde.toLocaleString()} ➔ ${hasta.toLocaleString()}</div>
+                </div>
+
+                <!-- 💵 DESGLOSE FINANCIERO DE PRECISIÓN -->
+                <div style="font-size: 12px; display: flex; flex-direction: column; gap: 4px; padding: 2px;">
+                    
+                    <!-- 🎯 TU NUEVO ITEM SOLICITADO: Fondo con el que se inició el turno -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #475569; font-weight: 500;">🪙 Fondo de Cambio Inicial:</span> 
+                        <strong style="color: #0f172a;">${fmtMX(fondoInicialTicketReal)}</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #475569; font-weight: 500;">💵 Efectivo bruto recibido:</span> 
+                        <strong style="color: #0f172a;">${fmtMX(totalCashBruto)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #ef4444; font-size: 11.5px; padding-left: 4px;">
+                        <span>↳ Cambio Entregado:</span> 
+                        <span style="font-weight: 600;">-${fmtMX(totalCambioEntregado)}</span>
+                    </div>
+                    <!-- 🎯 ITEM NUEVO 1: Efectivo Físico Contado Declarado por el Vendedor -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #0066ff;">
+                        <span>✓ Efectivo Físico Contado:</span> 
+                        <span style="font-weight: 700;">${fmtMX(granTotalEfectivoContado)}</span>
+                    </div>
+
+                    <!-- 🎯 ITEM NUEVO 2: Diferencia / Descuadre de Auditoría Dinámico -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: ${colorDiferenciaDinámica};">
+                        <span>⚠️ Diferencia / Descuadre:</span> 
+                        <span>${textoDiferenciaDinámica}</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #475569; font-weight: 500;">💳 Tarjeta:</span> 
+                        <span style="font-weight: 600; color: #475569;">${fmtMX(totalCard)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <span style="color: #475569; font-weight: 500;">📲 Transferencia:</span> 
+                        <span style="font-weight: 600; color: #475569;">${fmtMX(totalTransfer)}</span>
+                    </div>
+                    
+                    <!-- 👑 GRAN TOTAL ACTUALIZADO: Sumatoria de la Venta Total + el Fondo Inicial -->
+                    <div class="total-venta-badge" style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; padding: 6px 10px; border-radius: 6px; border: 1px solid #bbf7d0; margin-top: 2px;">
+                        <span style="color: #166534; font-weight: 700; font-size: 12px;">TOTAL CORTE FINAL:</span> 
+                        <span style="color: #15803d; font-size: 16px; font-weight: 800;">${fmtMX(granTotalAcumuladoCaja)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 🛍️ SECCIÓN DINÁMICA CON SCROLL EXCLUSIVO -->
+            <div class="seccion-articulos-scroll" style="flex-grow: 1; overflow-y: auto; padding-right: 4px; margin-bottom: 6px; max-height: 40vh; border-bottom: 1px solid #f1f5f9;">
+        `;
+        if (ventasPeriodo.length > 0) {
+            html += `
+            <h4 style="margin: 4px 0 6px 0; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Prendas / Artículos vendidos</h4>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+            `;
+            
+            Object.values(articleMap).forEach(a => {
+                html += `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 11.5px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px;">
+                    <span style="color: #334155; font-weight: 500; max-width: 75%, line-height: 1.2;">${a.nombre} <span style="color: #0066ff; font-weight: 700; margin-left: 2px;">x${a.qty}</span></span>
+                    <span style="font-weight: 600; color: #0f172a;">${fmtMX(a.monto)}</span>
+                </div>`;
+            });
+            
+            html += `</div>`;
+        } else {
+            html += `<div style="text-align: center; color: #64748b; font-size: 11.5px; padding: 12px 0;">Sin ventas en el periodo.</div>`;
+        }
+
+        // 🏷️ COMPLEMENTO INFERIOR FIJO: Clientes y Pie de página
+        html += `
+            </div> <!-- CIERRE DEL SCROLL DE ARTÍCULOS -->
+            
+            <div style="flex-shrink: 0; padding-top: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b; font-weight: 500;">
+                    <span>Clientes atendidos (tickets):</span> 
+                    <strong style="color: #0f172a; font-size: 12px;">${ventasPeriodo.length}</strong>
+                </div>
+                <div style="text-align: center; margin-top: 10px; font-size: 10px; font-weight: 600; color: #cbd5e1; letter-spacing: 0.5px; text-transform: uppercase;">MeetFashion POS</div>
+            </div>
+        </div>`;
+
+
+        // Pintar en preview (sobre producto-preview)
+        const preview = document.getElementById('producto-preview');
+        if (preview) {
+            preview.innerHTML = html;
+            preview.style.overflow = 'auto';
+            preview.style.padding = '12px';
+            preview.style.background = '#fff';
+            preview.style.border = '1px solid #eee';
+        }
+
+        const printCorte = document.getElementById('modal-print-corte');
+
+        // Flujo de impresión intacto
+        if(printCorte) {
+            printCorte.classList.remove('hidden');
+            const onYes = () => {
+                if (typeof window.printTicketHTML === 'function') {
+                    window.printTicketHTML(html);
+                } else {
+                    const w = window.open('', '_blank');
+                    w.document.write(html);
+                    w.document.close();
+                    w.print();
+                    w.close();
+                }
+                printCorte.classList.add('hidden');
+            }
+
             const onNo = () => { 
-	        printCorte.classList.add('hidden');
-	    };
+                printCorte.classList.add('hidden');
+            };
 
             document.getElementById('corte-print-yes').onclick = onYes;
             document.getElementById('corte-print-no').onclick = onNo;
+        }
 
-            // allow keyboard
-            function onKey(e){
-                if(e.key === 'Enter') onYes();
-                if(e.key === 'Escape') onNo();
-            }
+        setLastCutISO(now.toISOString());
 
-}
-    // MUY  IMPORTANTE:  marcar  el  corte  para  el  siguiente  periodo
-    setLastCutISO(now.toISOString());
+        cart = [];
+        recalc();
+        renderCart();
+        updatePaymentsDisplay();
 
-    //  Opcional:  “reiniciar”  la  UI  del  turno
-    cart  =  [];
-    recalc();
-    renderCart();
-    updatePaymentsDisplay();
+        // 🎯 GATILLO DE LIMPIEZA FINAL POST-RENDER: Vaciamos el modal de arqueo de forma segura al cierre
+        if (typeof limpiarFormularioModalArqueo === 'function') {
+            limpiarFormularioModalArqueo();
+        }
 
-    //  Restaurar el  logo  en  preview  si  presionas  Delete  sobre  el  área
-    //  (ya  tienes  el  handler;  si  quieres  hacerlo  automático,  descomenta)
-    //  const  previewBox  =  document.getElementById('producto-preview');
-    //  if  (previewBox?.dataset?.originalHtml)  previewBox.innerHTML  =  previewBox.dataset.originalHtml;
-
-};
-    const onNo = () => { 
-	document.getElementById('modal-corte').classList.add('hidden')
-    };
-
-    document.getElementById('corte-yes').onclick = onYes;
-    document.getElementById('corte-no').onclick = onNo;
-
-            // allow keyboard
-            function onKey(e){
-                if(e.key === 'Enter') onYes();
-                if(e.key === 'Escape') onNo();
-            }
+        // Purgamos las variables efímeras de la memoria temporal
+        delete window.montoFisicoContadoSnapshot;
+        delete window.montoFondoInicialSnapshot;
 
 });
 
 // ====================================================================
 // 🧾 REIMPRIMIR UN TICKET
 // ====================================================================
-document.getElementById('btn-reprint')?.addEventListener('click', ()=> {
+document.getElementById('btn-reprint')?.addEventListener('click', () => {
   // 1. Abrimos el modal quitando la clase hidden
   el.reimpModal && el.reimpModal.classList.remove('hidden');
   
-  // 2. Lógica nativa de tu ticket: asigna por defecto el folio del último ticket cobrado
-  const last = DB.getSales();
-  el.reimpTicket && (el.reimpTicket.value = last && last[0] ? (last[0].ticket || last[0].id || '') : '134');
+  // 2. Sincronización nativa de tu ticket: asigna por defecto el último ticket cobrado
+  const last = DB.getSales ? DB.getSales() : [];
+  if (el.reimpTicket) {
+      // Sugerimos el último folio real de la base de datos o lo dejamos limpio
+      el.reimpTicket.value = last && last.length > 0 ? (last[0].ticket || last[0].id || '') : '';
+  }
 
-  // 3. 🔥 SINCRONIZACIÓN DIRECTA POR ID REAL:
+  // 3. Sincronización directa de la Estación en el input real
   const inputEstacionModal = document.getElementById('reimp-station');
   if (inputEstacionModal) {
-      // Recuperamos el objeto del inicio de sesión
       const sesionActiva = JSON.parse(sessionStorage.getItem('pos_user') || '{}');
-      
-      // Forzamos el texto con la sucursal de la sesión de Wendy (ej: "Salto del Agua")
-      inputEstacionModal.value = sesionActiva.estacion || sesionActiva.station;
-      
-      // La hacemos de solo lectura para evitar alteraciones accidentales en mostrador
+      inputEstacionModal.value = sesionActiva.estacion || sesionActiva.station || 'Salto del Agua';
       inputEstacionModal.readOnly = true;
+  }
+
+  // ====================================================================
+  // 🔥 CORRECCIÓN 1: LIMPIEZA TOTAL DE HISTORIAL AL ABRIR EL MODAL
+  // ====================================================================
+  const previewContenedor = el.reimpPreview || document.getElementById('reimp-preview');
+  if (previewContenedor) {
+      // Borramos por completo el ticket anterior o las alertas rojas de bloqueo previas
+      previewContenedor.innerHTML = '<div style="color:#64748b; font-size:12px; text-align:center; padding-top:40px; font-family:sans-serif;">Esperando búsqueda de ticket...</div>';
+  }
+
+  // ====================================================================
+  // 🔥 CORRECCIÓN 2: FORZAR BOTÓN INHABILITADO EN GRIS AL ARRANCAR
+  // ====================================================================
+  const botonImprimirReal = document.getElementById('reimp-print') || el.reimpPrint;
+  if (botonImprimirReal) {
+      botonImprimirReal.disabled = true;
+      botonImprimirReal.style.backgroundColor = '#cbd5e1'; // Gris limpio de auditoría
+      botonImprimirReal.style.color = '#94a3b8';
+      botonImprimirReal.style.cursor = 'not-allowed';
   }
 });
 
+// ====================================================================
+// ENLACE PARA REDIRECCIONAR A INVENTARIOS
+// ====================================================================
+document.getElementById('btn-open-inventory')?.addEventListener('click', () => {
+    window.location.href = 'inventarios.html';
+});
 
- const  previewBox  = document.getElementById('producto-preview');
- 
- if  (previewBox) {
-     // Guardar  el  HTML  original (el  logo)
-    previewBox.dataset.originalHtml  =  previewBox.innerHTML;
- 
-    //  Hacerlo focusable
-     previewBox.setAttribute('tabindex', '0');
- 
-    //  Al  hacer  click, darle  foco
-    previewBox.addEventListener('click',  ()  =>  previewBox.focus());
 
-     // Escuchar  tecla  Supr/Delete
-    document.addEventListener('keydown',  (e)  => {
-        const  isDelete  = e.key  ===  'Delete'  || e.key  ===  'Backspace';
-        if (isDelete  &&  document.activeElement  === previewBox)  {
-           e.preventDefault();
-            // Restaurar  el  logo  original
-           previewBox.innerHTML  = previewBox.dataset.originalHtml;
+// ====================================================================
+// 🔒 LIMPIADO DEL PREVIEW DEL CORTE CON PURGA DE CAJA INTEGRADA
+// ====================================================================
+const previewBox = document.getElementById('producto-preview');
+ 
+if (previewBox) {
+    // Guardar el HTML original (el logo)
+    previewBox.dataset.originalHtml = previewBox.innerHTML;
+ 
+    // Hacerlo focusable
+    previewBox.setAttribute('tabindex', '0');
+ 
+    // Al hacer click, darle foco
+    previewBox.addEventListener('click', () => previewBox.focus());
+
+    // Escuchar tecla Supr/Delete
+    document.addEventListener('keydown', (e) => {
+        const isDelete = e.key === 'Delete' || e.key === 'Backspace';
+        
+        if (isDelete && document.activeElement === previewBox) {
+            e.preventDefault();
+            
+            // 1. Restaurar el logo original de tu diseño intacto
+            previewBox.innerHTML = previewBox.dataset.originalHtml;
+
+            // 2. 🔥 EL CANDADO ABSOLUTO POST-CIERRE:
+            // Forzamos una recarga limpia profunda de la ventana del navegador.
+            // Al refrescar la pantalla, tu método 'validarBloqueoAperturaCaja()' se 
+            // ejecutará al milisegundo cero, leerá 'false' en el LocalStorage porque 
+            // el corte ya eliminó el fondo, congelará la barra superior azul y 
+            // desplegará de forma obligatoria tu modal de billetes para la nueva jornada.
+            window.location.reload();
         }
     });
 
@@ -1124,19 +1886,22 @@ document.addEventListener('keydown', (e)  =>  {
 
  }
 
-// // init display
-// Forzamos el cálculo real basándonos estrictamente en las ventas reales en disco
-const ventasFisicasRaw = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
-const seqInicialReal = ventasFisicasRaw.length + 1;
+// ====================================================================
+// 🔍 // init display CORREGIDO: CALCULO DE CONSECUTIVO REAL DESDE DISCO
+// ====================================================================
+const listaVentasHistorial = DB.getSales ? DB.getSales() : (JSON.parse(localStorage.getItem('ventas')) || []);
+// Si tu última venta exitosa es la 137, el consecutivo real es estrictamente el 138
+const consecutivoRealCalculado = listaVentasHistorial.length + 1;
 
-// Limpiamos de raíz cualquier rastro del número 143 en la memoria del navegador
-sessionStorage.setItem('pos_ticket_seq', seqInicialReal.toString());
-ticketSeq = seqInicialReal; 
+// Sincronizamos de forma obligatoria las variables globales y de sesión para limpiar los folios inflados
+ticketSeq = consecutivoRealCalculado;
+sessionStorage.setItem('pos_ticket_seq', consecutivoRealCalculado.toString());
 
 if (el.ticketNum) {
-    el.ticketNum.textContent = `Ticket: #${String(seqInicialReal).padStart(6,'0')}`;
+    el.ticketNum.textContent = `Ticket: #${String(consecutivoRealCalculado).padStart(6, '0')}`;
 }
 
-renderResults(catalog);
+renderResults(catalog); // pondrá lista en #results (oculto)
 recalc();
 updatePaymentsDisplay();
+
