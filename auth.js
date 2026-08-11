@@ -74,29 +74,34 @@ document.getElementById('login-ok')?.addEventListener('click', () => {
 });
 
 // ====================================================================
-// 🔒 FUNCIÓN DE VALIDACIÓN PERIMETRAL CENTRALIZADA Y SEGURA (AUTH.JS)
+// 🔒 FUNCIÓN DE VALIDACIÓN PERIMETRAL CENTRALIZADA Y SEGURA
 // ====================================================================
 function verificarAccesoPantalla() {
+    // 🎯 REGLA DE INMUNIDAD 1: Si el navegador aún no carga db.js,
+    // usamos una lectura directa de resguardo para que la consola NUNCA truene.
+    const listaUsuariosDB = (typeof DB !== 'undefined' && DB.getUsers) 
+                            ? DB.getUsers() 
+                            : (JSON.parse(localStorage.getItem('usuarios')) || []);
+
     const cashierId = sessionStorage.getItem('pos_cashier');
     const usuarioSesionActiva = JSON.parse(sessionStorage.getItem('pos_user'));
     
-    // Obtenemos el nombre del archivo actual limpio (ej: "catalog.html")
+    // Extraemos el nombre de la página actual limpia
     const paginaActual = window.location.pathname.split('/').pop() || 'ventas.html';
 
-    // Si está en el POS principal de cobro, el acceso siempre es libre
+    // Si está en la pasarela de ventas o no hay página, el acceso es libre
     if (paginaActual === 'ventas.html' || paginaActual === '') return;
 
-    // Si intentan entrar por URL sin haber iniciado sesión, expulsión inmediata
+    // Si intentan burlar la URL sin sesión, expulsión inmediata
     if (!cashierId || !usuarioSesionActiva) {
         window.location.href = 'ventas.html'; 
         return;
     }
 
-    // 🎯 EL CONTROL DE LA VERDAD: Consultamos el disco duro en tiempo real para evitar caché vieja
-    const listaUsuariosDB = DB.getUsers ? DB.getUsers() : (JSON.parse(localStorage.getItem('usuarios')) || []);
+    // Buscamos al usuario en la lista de resguardo del disco duro
     const usuarioVigente = listaUsuariosDB.find(x => (x.user || x.usuario) === cashierId);
 
-    // Si el usuario fue eliminado de la base de datos mientras operaba, lo echamos
+    // Si fue eliminado o no existe en la base, cerramos la pestaña
     if (!usuarioVigente) {
         sessionStorage.clear();
         window.location.href = 'ventas.html';
@@ -106,53 +111,56 @@ function verificarAccesoPantalla() {
     const rolActual = String(usuarioVigente.role || usuarioVigente.rol || '').toLowerCase();
     const aliasLogueado = String(cashierId).toLowerCase();
 
-    // 👑 INMUNIDAD MASTER GENERAL: El dueño (master, sup, admin) tiene pase libre a todo por diseño
+    // 👑 INMUNIDAD MASTER: Máximas autoridades heredan acceso total automático
     const esMaestro = rolActual === 'master' || aliasLogueado === 'sup' || aliasLogueado === 'admin';
     if (esMaestro) return; 
 
-    // ====================================================================
-    // 🔒 EVALUACIÓN DE PRIVILEGIOS GRANULARES PARA ADMINISTRADORES / CAJEROS
-    // ====================================================================
+    // Evaluación granular de permisos basada en la base de datos real
     const p = usuarioVigente.permisos || { catalogo: {}, reportes: {}, usuarios: {}, estaciones: {}, inventarios: {} };
     let tieneAcceso = true;
     let nombreSeccionEstetica = "";
 
-    // Candado A: Catálogo
     if (paginaActual.includes('catalog.html')) {
         tieneAcceso = p.catalogo?.ver === true;
         nombreSeccionEstetica = "Catálogo";
     }
-    // Candado B: Usuarios / Personal
     else if (paginaActual.includes('users.html')) {
         tieneAcceso = p.usuarios?.ver === true;
         nombreSeccionEstetica = "Personal / Usuarios";
     }
-    // Candado C: Estaciones de Trabajo
     else if (paginaActual.includes('estaciones.html')) {
         tieneAcceso = p.estaciones?.ver === true;
         nombreSeccionEstetica = "Estaciones";
     }
-    // Candado D: 🔥 NUEVO BLINDAJE PARA EL PANEL DE REPORTES
     else if (paginaActual.includes('reportes.html')) {
         tieneAcceso = p.reportes?.ver === true;
         nombreSeccionEstetica = "Reportes";
     }
-    // Candado E: 🔥 NUEVO BLINDAJE PARA EL PANEL DE INVENTARIOS MASIVOS
     else if (paginaActual.includes('inventarios.html')) {
         tieneAcceso = p.inventarios?.ver === true;
         nombreSeccionEstetica = "Inventarios";
     }
 
-    // ❌ INTERCEPCIÓN OPERATIVA RIGUROSA
+    // Intercepción restrictiva unificada
     if (!tieneAcceso) {
         alert(`❌ ACCESO RESTRINGIDO:\nEl usuario "${usuarioVigente.user}" no cuenta con los permisos requeridos para visualizar la sección de ${nombreSeccionEstetica}.`);
-        window.location.href = 'ventas.html'; // Lo expulsa de inmediato al POS de forma limpia
+        window.location.href = 'ventas.html'; 
     }
 }
 
-// Aseguramos el arranque automático en el ciclo de carga de auth.js
+// ====================================================================
+// ⏳ ARRANCADOR ASÍNCRONO SEGURO (EL FIX PARA LA LÍNEA 155)
+// En lugar de disparar la función al vuelo en la línea 155, esperamos
+// obligatoriamente a que el navegador termine de estructurar el DOM
+// y cargue el objeto maestro DB de db.js.
+// ====================================================================
 if (typeof window !== 'undefined') {
-    verificarAccesoPantalla();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', verificarAccesoPantalla);
+    } else {
+        // Si el DOM ya cargó, se ejecuta de forma segura
+        verificarAccesoPantalla();
+    }
 }
 
 
