@@ -8,24 +8,25 @@
 </head>
 <body>
 <header class="topbar">
-    <div class="title">Catálogo de Artículos</div>
-   <div  class="topbar-right">
+    <div class="title">
+	<h2 style="color: white;">Catálogo de Artículos</h2>
+   </div>
+   <div  class="topbar-left">
        <div>
-           <button class="btn-sec" onclick="window.location='ventas.html'">← Volver al POS</button>
+           <button class="btn-sec" onclick="window.location='ventas.html'"><span>↩️</span> Volver al POS</button>
 	   <input id="file-csv" type="file" accept=".csv" />
-           <button class="btn small" onclick="abrirNuevo()">+ Nuevo Artículo</button>
-   	   <button id="btn-import-csv" class="btn small">Importar Catálogo</button>
-	   <button id="btn-export-csv" class="btn small">Exportar Catálogo</button>
-	   <button class="btn small" onclick="exportInventoryLogCSV()" style="background-color: #28a745;">
-	       📊 Exportar Historial de Stock
-	   </button>
+	   <button id="btn-cat-nuevo" class="btn small" onclick="abrirNuevo()">+ Nuevo Artículo</button>
+	   <button id="btn-import-csv" class="btn small" onclick="triggerImport()">Importar Catálogo</button>
+	   <button id="btn-export-csv" class="btn small" onclick="exportCatalogCSV()">Exportar Catálogo</button>
+	   <button id="btn-cat-exphistorial" class="btn small" onclick="exportInventoryLogCSV()" style="background-color: #28a745;">📊 Exportar Historial de Stock</button>
+
        </div>
     </div>
 
 </header>
 
 
-<div class="container">
+<div class="">
  <input  id="search-cat"  type="search"  placeholder="Buscar artículo..."  />
 
     <table class="cat-table">
@@ -92,7 +93,7 @@
       <div class="form-row" style="margin-bottom: 15px;">
           <label>Tipo de Operación *</label>
           <!-- 🔥 CAMBIO: Usamos 'inventory-modal-type' como ID único -->
-          <select id="inventory-modal-type" style="width: 100%;">
+          <select id="inventory-modal-type">
               <option value="entrada_surtido">📈 Entrada - Surtido de Mercancía</option>
               <option value="entrada_traspaso">🔄 Entrada - Traspaso de Tienda</option>
               <option value="salida_traspaso">🔄 Salida - Traspaso de Tienda</option>
@@ -104,7 +105,7 @@
       <div class="form-row" style="margin-bottom: 15px;">
           <label>Motivo / Comentarios Breves *</label>
           <!-- 🔥 CAMBIO: Usamos 'inventory-modal-reason' como ID único -->
-          <input id="inventory-modal-reason" placeholder="Ej: Mercancía recibida..." style="width: 100%;">
+          <input id="inventory-modal-reason" placeholder="Ej: Mercancía recibida...">
       </div>
 
       <div class="form-row" style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -128,6 +129,7 @@
                       <th style="padding: 8px;">Fecha / Hora</th>
                       <th style="padding: 8px;">Usuario</th>
                       <th style="padding: 8px;">Operación</th>
+		      <th style="padding: 8px;">Stock Ant.</th> 
                       <th style="padding: 8px;">Cantidad</th>
                       <th style="padding: 8px;">Stock Final</th>
                       <th style="padding: 8px;">Motivo / Comentarios</th>
@@ -145,10 +147,8 @@
    </div>
 </div>
 
-
-<script  src="auth.js"></script>
-<script>requireRole('admin');</script>
 <script src="db.js"></script>
+<script  src="auth.js"></script>
 <script src="catalog.js"></script>
 
 </body>
