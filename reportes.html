@@ -9,46 +9,77 @@
 
 <body>
 <header class="topbar">
-    <div class="title">Reportes y ventas</div>
-    <div  class="topbar-left">
-       <button class="btn-sec" onclick="location.href='ventas.html'">← Volver al POS</button>
+    <div class="title">
+	<h2>Gestión de Reportes</h2>
+    </div>
+    <div class="topbar-left">
+       <button class="btn-sec" onclick="location.href='ventas.html'"><span>↩️</span> Volver al POS</button>
        <button id="btn-exportar" class="btn small" style="background-color: #28a745;">Exportar CSV</button>
    </div>
 </header>
 
-  <main class="container">
+    <main class="container">
+    <section class="card">
+        <div class="container">
+           
+            <!-- 👑 CENTRO DE CONTROL UNIFICADO EN UNA SOLA LÍNEA DE ALTA FIDELIDAD -->
+            <div class="top-controls-flex-row" style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; margin-bottom: 15px; padding-bottom: 0; width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: 16px;">
+                
+                <!-- 🗂️ COLUMNA IZQUIERDA: Tus tres pestañas dinámicas con tu línea elástica inferior -->
+                <div class="tabs-navigation-wrapper" style="display: flex; gap: 4px; margin-bottom: -2px;">
+                    <button type="button" class="tab-trigger active" data-reporte="ventas" style="padding: 10px 20px; font-size: 13px; font-weight: 700; color: #0066ff; background: none; border: none; border-bottom: 3px solid #0066ff; cursor: pointer; transition: all 0.15s;">🛒 Ventas Globales</button>
+                    <button type="button" class="tab-trigger" data-reporte="cortes" style="padding: 10px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.15s;">💵 Cortes de Caja</button>
+                    <button type="button" class="tab-trigger" data-reporte="tickets" style="padding: 10px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.15s;">🧾 Historial de Tickets</button>
+                </div>
 
-<section  class="card">
-      <div  class="container">
-       <h2>Reportes  de Cortes y Ventas</h2>
+                <!-- 📊 COLUMNA DERECHA: Tus filtros de fecha integrados de corrido sin títulos superiores -->
+                <div class="filters" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0;">
+                    <input type="date" id="desde" class="search-box-premium" style="max-width: 140px; padding: 6px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; font-family: system-ui, sans-serif;">
+                    <span style="color: #64748b; font-size: 13px; font-weight: 600;">al</span>
+                    <input type="date" id="hasta" class="search-box-premium" style="max-width: 140px; padding: 6px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; font-family: system-ui, sans-serif;">
+                    
+                    <!-- Tu selector nativo oculto en segundo plano para el motor de auth.js -->
+                    <select id="tipo-reporte" style="display: none;">
+                        <option value="ventas" id="opt-perm-ventas">Ventas</option>
+                        <option value="cortes" id="opt-perm-cortes" selected>Cortes</option>
+                        <option value="tickets" id="opt-perm-tickets">Tickets</option>
+                    </select>
 
-<div class="filters">
-    <label>Desde: <input type="date" id="desde"></label>
-    <label>Hasta: <input type="date" id="hasta"></label>
-    <label>Tipo de reporte:
-        <select id="tipo-reporte">
-            <!-- 🔥 ÚNICO CAMBIO: Añadidos IDs únicos a las opciones internas -->
-            <option value="ventas" id="opt-perm-ventas">Ventas</option>
-            <option value="cortes" id="opt-perm-cortes" selected>Cortes</option>
-	    <option value="tickets" id="opt-perm-tickets">Tickets</option>
-        </select>
-    </label>
-    <button id="btn-buscar" class="btn primary">Buscar</button>
-</div>
-       <div  id="lista-fechas"  class="report-results"></div>
+                    <button id="btn-buscar" class="btn primary" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border-radius: 4px; height: auto; margin: 0;">Buscar</button>
+                    <button id="btn-limpiar-filtros" class="btn-sec" type="button" style="padding: 6px 12px; font-size: 12.5px; font-weight: 600; border-radius: 4px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; cursor: pointer; height: auto;">Ver Todo</button>
+                </div>
+
+            </div>
+
+            <!-- 📋 CONSERVA TU CONTENEDOR NATIVO DE RESULTADOS EXACTAMENTE IGUAL -->
+            <div id="lista-fechas" class="report-results"></div>
+
+
+        <!-- ◀ ▶ PIE DE PAGINACIÓN INTEGRADO A TU DISEÑO CORPORATIVO -->
+        <div id="paginador-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 14px; box-sizing: border-box; width: 100%;">
+            <span id="info-pago-texto" style="font-size: 12.5px; color: #64748b; font-weight: 500; font-family: system-ui, sans-serif;">Mostrando 0-0 de 0 registros</span>
+            <div style="display: flex; gap: 8px;">
+                <!-- 🎯 ADOPTA TUS MISMAS CLASES PREMIUM '.btn-sec' DE TU HEADER -->
+                <button type="button" id="btn-prev-pagina" class="btn primary" style="padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    ◀ Anterior
+                </button>
+                <button type="button" id="btn-next-pagina" class="btn primary" style="padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    Siguiente ▶
+                </button>
+            </div>
+        </div>
+
+
    </div>
 </section>
-  </main>
-
-<div  id="detalle-panel"  class="detalle-panel hidden">
-   <div  class="detalle-header">
-      <h3  id="detalle-fecha">Detalle  del corte</h3>
-       <button onclick="cerrarDetalle()"  class="btn-close">×</button>
+</main>
+<div id="detalle-panel" class="detalle-panel hidden">
+   <div class="detalle-header">
+      <h3 id="detalle-fecha">Detalle del corte</h3>
+       <button onclick="cerrarDetalle()" class="btn-close">×</button>
    </div>
-   <div  id="detalle-contenido" class="detalle-body"></div>
+   <div id="detalle-contenido" class="detalle-body"></div>
 </div>
-
-
 
 <style>
 /* ========================================================
@@ -86,6 +117,98 @@
     background-color: #e6f0fa !important;
     border-left: 4px solid #0066ff; /* Agrega una pequeña barra azul guía al inicio */
 }
+
+/* ========================================================
+   ESTILOS DE PANEL LATERAL CON PIE FIJO (STICKY TOTAL)
+   ======================================================== */
+
+/* Contenedor principal del panel lateral derecho */
+.detalle-panel {
+    position: fixed;
+    right: 0;
+    top: 60px; /* Ajusta según la altura de tu barra superior */
+    width: 350px;
+    height: calc(100vh - 60px);
+    background-color: #ffffff;
+    box-shadow: -4px 0 15px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column; /* 🔥 Hace que el contenido se distribuya verticalmente */
+    z-index: 100;
+    transition: transform 0.3s ease;
+}
+
+/* 1. CABECERA SIEMPRE VISIBLE */
+.detalle-header {
+    padding: 15px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Impide que se encoja */
+}
+
+/* 2. CUERPO CON SCROLL INTERNO INDEPENDIENTE */
+.detalle-body {
+    padding: 20px;
+    overflow-y: auto; /* 🔥 ACTIVA EL SCROLL SOLO EN ESTA SECCIÓN */
+    flex-grow: 1;    /* Toma todo el espacio disponible del medio */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Estructura interna que inyecta JS (Colocaremos clases para congelar el total) */
+.ticket-info-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.ticket-products-scroll {
+    overflow-y: auto;
+    max-height: 250px; /* Limita la altura de la tabla de ropa para forzar su propio scroll */
+    margin-bottom: 15px;
+    border: 1px solid #f1f5f9;
+    border-radius: 6px;
+}
+
+/* 3. PIE DE TICKET CON EL TOTAL SIEMPRE CONGELADO ABAJO */
+.ticket-total-sticky {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    padding-top: 15px;
+    border-top: 2px dashed #cbd5e1;
+    margin-top: auto; /* Se empuja magnéticamente al fondo del panel */
+    text-align: right;
+}
+
+/* ========================================================
+   ESTILOS DE PANEL LATERAL DE CORTES (STICKY TOTAL)
+   ======================================================== */
+
+/* Contenedor de scroll exclusivo para la lista de productos del corte */
+.corte-products-scroll {
+    overflow-y: auto;
+    max-height: 250px; /* Limita la altura de la lista para activar el scroll interno */
+    margin-bottom: 15px;
+    border: 1px solid #f1f5f9;
+    border-radius: 6px;
+    background: #ffffff;
+    padding: 10px;
+}
+
+/* Pie del corte congelado de forma fija abajo */
+.corte-total-sticky {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    padding-top: 15px;
+    border-top: 2px dashed #cbd5e1;
+    margin-top: auto; /* Empuja el bloque magnéticamente hacia el fondo */
+    text-align: right;
+}
+
 
 </style>
 
