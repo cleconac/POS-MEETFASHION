@@ -25,7 +25,7 @@
       <input id="login-pass" type="password" autocomplete="current-password">
       <label>Estación</label>
       <select id="login-station">
-        <option>Principal</option>
+        <option value="">-- Sin estación / Acceso Global --</option>
       </select>
 
       <div class="login-actions">
@@ -52,18 +52,7 @@
    <div  class="topbar-right">
        <nav  class="topbar-nav">
            <button id="btn-catalogo"  class="btn  small">Catálogo  (F2)</button>
-          <button  id="btn-cobrar"  class="btn  small">Cobrar  (F5)</button>
-
-           <div  class="dropdown">
-              <button  class="btn  small admin-only">Admin  ▾</button>
-              <div  class="dropdown-menu">
-                  <button  id="btn-open-catalog"  class="small">Catálogo</button>
-                  <button  id="btn-open-reports"  class="small">Reportes</button>
-                  <button  id="btn-users"  class="small">Usuarios</button>
-                  <button  id="btn-stations"  class="small">Estaciones</button>
-              </div>
-           </div>
-
+           <button  id="btn-cobrar"  class="btn  small">Cobrar  (F5)</button>
            <button  id="btn-cashcount"  class="btn small">Conteo  efectivo</button>
            <button  id="btn-corte" class="btn  small">Corte</button>
            <button  id="btn-logout" class="btn  small  alt">Cerrar  sesión</button>
@@ -77,6 +66,39 @@
 
     <!-- CONTENEDOR PRINCIPAL -->
     <div id="pos-body">
+
+<!-- 🏪 NUEVA BARRA LATERAL RETRÁCTIL (SIDEBAR NAV) EN VENTAS.HTML -->
+<div class="sidebar-container admin-only">
+    <!-- Encabezado superior de la barra lateral -->
+    <div class="sidebar-header">
+        <span class="sidebar-brand">MeetFashion</span>
+        <span class="sidebar-subtitle">Panel Admin</span>
+    </div>
+
+    <!-- 🎯 BOTONERA CRÍTICA (Conserva tus IDs nativos de navegación) -->
+    <div class="sidebar-menu-list">
+	<button id="btn-open-catalog" class="sidebar-item">
+            <span class="sidebar-icon">🛍️</span> Catálogo
+	</button>
+	<button id="btn-open-reports" class="sidebar-item">
+            <span class="sidebar-icon">📊</span> Reportes
+	</button>
+	<button id="btn-users" class="sidebar-item">
+            <span class="sidebar-icon">👥</span> Usuarios
+	</button>
+	<button id="btn-stations" class="sidebar-item">
+            <span class="sidebar-icon">🏪</span> Estaciones
+	</button>
+	<button id="btn-open-inventory" class="sidebar-item">
+	   <span class="sidebar-icon">📦</span> Inventarios
+	</button>
+    </div>
+    
+    <!-- Pie de la barra para soporte o versión -->
+    <div class="sidebar-footer">
+        <span>POS v2.5 • Premium</span>
+    </div>
+</div>
 
         <!-- COLUMNA IZQUIERDA -->
         <div id="col-izq">
@@ -116,8 +138,9 @@
 
   <!-- Modal conteo de efectivo -->
 <div id="modal-cashcount" class="modal hidden">
-  <div class="modal-content">
-    <h3>Conteo de efectivo</h3>
+  <div class="modal-content" style="max-width: 480px;">
+    <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #1e293b;">💵 Arqueo de Caja y Declaración de Efectivo</h3>
+    <p style="margin: 0 0 16px 0; font-size: 12.5px; color: #64748b; line-height: 1.4;">Declare el total de monedas y billetes físicos que se encuentran actualmente en la gaveta de dinero antes de iniciar turno de venta.</p>
     <div id="denoms-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px"></div>
     <div style="margin-top:12px; display:flex;justify-content:space-between;align-items:center">
       <div class="total-conteo-efectivo">Total contado: <strong id="cashcount-total">$0.00</strong></div>
@@ -126,6 +149,61 @@
         <button id="cashcount-close" class="btn alt">Salir</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- 🔒 MODAL NUEVO E INDEPENDIENTE: DECLARACIÓN DE ARQUEO A CIEGAS       -->
+<!-- ==================================================================== -->
+<div id="modal-arqueo-ciegas" class="modal hidden">
+  <div class="modal-content" style="max-width: 480px;">
+    <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #1e293b;">💵 Arqueo de Caja y Declaración de Efectivo</h3>
+    <p style="margin: 0 0 16px 0; font-size: 12.5px; color: #64748b; line-height: 1.4;">Declare el total de monedas y billetes físicos que se encuentran actualmente en la gaveta de dinero antes de procesar el corte del sistema.</p>
+    
+    <!-- Matriz elástica de dos columnas para captura de billetes y monedas -->
+    <div id="arqueo-denoms-list" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 8px;">
+      <!-- Billetes -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$1000 <input type="number" min="0" id="arq-b1000" class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$500  <input type="number" min="0" id="arq-b500"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$200  <input type="number" min="0" id="arq-b200"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$100  <input type="number" min="0" id="arq-b100"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$50   <input type="number" min="0" id="arq-b50"   class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+      </div>
+      <!-- Monedas -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$20 <input type="number" min="0" id="arq-m20" class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$10 <input type="number" min="0" id="arq-m10" class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$5  <input type="number" min="0" id="arq-m5"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$2  <input type="number" min="0" id="arq-m2"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #334155;">$1  <input type="number" min="0" id="arq-m1"  class="input-arqueo-val" value="0" style="width: 70px; text-align: center; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"></label>
+      </div>
+    </div>
+    
+    <!-- Barra inferior del total y controles de confirmación -->
+    <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 16px; gap: 12px; width: 100%; box-sizing: border-box;">
+      
+      <!-- Visor Negro Rediseñado y Compacto -->
+      <div style="background: #0f172a; color: #ffffff; padding: 10px 16px; border-radius: 6px; font-weight: 800; font-size: 15px; min-width: 110px; text-align: center; font-family: monospace; box-sizing: border-box;">
+        <span id="arqueo-ciegas-total">$0.00</span>
+      </div>
+      
+      <!-- Botonera de Control Alineada Horizontalmente -->
+      <div style="display: flex; gap: 8px; flex-grow: 1; justify-content: flex-end; align-items: center;">
+        
+        <!-- 🎯 BOTÓN DE CORTE: Arranca deshabilitado en gris, con transiciones suaves -->
+        <button type="button" id="btn-arqueo-confirmar-corte" class="btn" disabled style="background-color: #cbd5e1; color: #94a3b8; border: none; padding: 10px 18px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: not-allowed; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; white-space: nowrap;">
+            <span>🔒</span> Confirmar e Imprimir Corte
+        </button>
+        
+        <!-- Botón Salir (Escondido para vendedoras, visible para máster si es necesario) -->
+        <button type="button" id="btn-arqueo-cancelar" class="btn alt" style="padding: 10px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">
+            Salir
+        </button>
+      </div>
+
+    </div>
+
   </div>
 </div>
 
@@ -274,7 +352,7 @@
           <div style="font-size:13px;color:#666">Previsualización</div>
           <div id="reimp-preview" style="margin-top:8px;font-size:13px"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-            <button id="reimp-print" class="btn">Imprimir</button>
+	    <button id="reimp-print" class="btn" disabled style="background-color: #cbd5e1; color: #94a3b8; cursor: not-allowed;">Imprimir</button>
           </div>
         </div>
       </div>
@@ -326,6 +404,7 @@
 <div id="ticket-print-area" style="display:none;"></div>
 
   <script src="db.js"></script>
+  <script  src="auth.js"></script>
 
   <!-- Cargar módulos primero -->
   <script type="module">
