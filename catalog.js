@@ -28,40 +28,96 @@ function cargarCatalogo(page = 1) {
        if (!body) return;
        body.innerHTML = "";
 
+       // CAMBIO DENTRO DEL data.forEach DE TU FUNCIÓN cargarCatalogo():
        data.forEach(a => {
               const tr = document.createElement("tr");
               const stockSeguro = typeof a.stock !== 'undefined' ? a.stock : 0;
               
-              // Formatear fecha legible o poner un guion si no ha sido modificado
               const fechaLegible = a.ultimo_movimiento ? new Date(a.ultimo_movimiento).toLocaleString() : '—';
               const usuarioUltimo = a.usuario_movimiento || '—';
 
-// Busca esta sección dentro del data.forEach de tu cargarCatalogo() y actualiza las celdas:
-tr.innerHTML = `
-       <td>${a.codigo}</td>
-       <td>${a.nombre}</td>
-       <td>${mxn ? mxn(a.precio) : '$' + Number(a.precio).toFixed(2)}</td>
-       <td><strong>${stockSeguro}</strong></td>
-       
-       <!-- Añadidas las clases CSS para homologar los textos -->
-       <td><span class="audit-date">${fechaLegible}</span></td>
-       <td><span class="audit-user">${usuarioUltimo}</span></td>
-       
-       <td>
-              <button class="btn-primary" onclick="editar('${a.codigo}')">Editar</button>
-              <button class="btn-sec" onclick="eliminar('${a.codigo}')">Eliminar</button>
-              <button class="btn-sec" onclick="openStockModal('${a.codigo}')">📋 Stock</button>
-              <!-- 🔥 MEJORA DE GESTIÓN: Botón para ver todas las fechas de movimiento -->
-              <button class="btn-sec" onclick="verHistorialArticulo('${a.codigo}')" title="Ver Historial de Cambios">⏳ Historial</button>
-       </td>
-`;
+              // Extraemos el subobjeto de permisos del catálogo de la sesión activa
+              const aliasLogueado = (activeCatalogUserSession?.user || activeCatalogUserSession?.usuario || '').toLowerCase();
+              const esMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin';
+              
+              const p = esMaestro ? { editar: true, eliminar: true, stock: true, historial: true } : (activeCatalogUserSession?.permisos?.catalogo || {});
+
+              // 1. EVALUAR CADA BOTÓN DE FORMA SEPARADA SEGÚN EL MAPA DE PERMISOS
+              let botonEditarHtml = '';
+              let botonEliminarHtml = '';
+              let botonStockHtml = '';
+              let botonHistorialHtml = '';
+
+              if (esMaestro || p.editar) {
+                  botonEditarHtml = `<button class="btn small" style="background-color: #0066ff"; onclick="editar('${a.codigo}')">✏️ Editar</button>`;
+              }
+
+              if (esMaestro || p.eliminar) {
+                  botonEliminarHtml = `<button class="btn small" style="background-color: #dc3545"; onclick="eliminar('${a.codigo}')">🗑️ Eliminar</button>`;
+              }
+
+              if (esMaestro || p.stock) {
+                  botonStockHtml = `<button class="btn small" style="background-color: #cbd5e1"; onclick="openStockModal('${a.codigo}')">📋 Stock</button>`;
+              }
+
+              if (esMaestro || p.historial) {
+                  botonHistorialHtml = `<button class="btn small" style="background-color: #6f42c1"; onclick="verHistorialArticulo('${a.codigo}')">⏳ Historial</button>`;
+              }
+
+              // 2. INYECCIÓN TOTALMENTE CENTRADA Y LIMPIA EN EL RENGLÓN
+              tr.innerHTML = `
+                     <td>${a.codigo}</td>
+                     <td>${a.nombre}</td>
+                     <td>${mxn ? mxn(a.precio) : '$' + Number(a.precio).toFixed(2)}</td>
+                     <td><strong>${stockSeguro}</strong></td>
+                     <td><span class="audit-date">${fechaLegible}</span></td>
+                     <td><span class="audit-user">${usuarioUltimo}</span></td>
+                     <td>
+                            ${botonEditarHtml}
+                            ${botonEliminarHtml}
+                            ${botonStockHtml}
+                            ${botonHistorialHtml}
+                     </td>
+              `;
               body.appendChild(tr);
        });
+
 
        if (typeof renderPagination === "function") {
            renderPagination(totalPages);
        }
 }
+
+
+// 1. Obtener de forma segura la sesión del administrador que está operando en la terminal
+const activeCatalogUserSession = JSON.parse(sessionStorage.getItem('pos_user')) || null;
+
+// 2. Función para evaluar los botones superiores de la barra de herramientas
+function validarCandadosCabeceraCatalogo() {
+    if (!activeCatalogUserSession) return;
+
+    const aliasLogueado = (activeCatalogUserSession.user || activeCatalogUserSession.usuario || '').toLowerCase();
+    const esMaestro = aliasLogueado === 'sup' || aliasLogueado === 'admin';
+    
+    const p = esMaestro ? { nuevo: true, importar: true, exportar_cat: true, exportar_stock: true } : (activeCatalogUserSession.permisos?.catalogo || {});
+
+    // Sincronizados con tu HTML real
+    const btnNuevo       = document.getElementById('btn-cat-nuevo');
+    const btnImportar    = document.getElementById('btn-import-csv');
+    const btnExportar    = document.getElementById('btn-export-csv');
+    const btnExpHistorial = document.getElementById('btn-cat-exphistorial');
+
+    if (btnNuevo)       btnNuevo.style.display = (esMaestro || p.nuevo) ? '' : 'none';
+    if (btnImportar)    btnImportar.style.display = (esMaestro || p.importar) ? '' : 'none';
+    if (btnExportar)    btnExportar.style.display = (esMaestro || p.exportar_cat) ? '' : 'none';
+    if (btnExpHistorial) btnExpHistorial.style.display = (esMaestro || p.exportar_stock) ? '' : 'none';
+}
+
+
+// Forzamos el arranque de las validaciones de cabecera en cuanto el catálogo abre
+document.addEventListener("DOMContentLoaded", () => {
+    validarCandadosCabeceraCatalogo();
+});
 
 
 function renderPagination(totalPages) {
@@ -131,8 +187,13 @@ function abrirNuevo() {
 
 // ---------- EDITAR ----------
 function editar(id) {
-    const art = DB.getArticulo(id);
+    // Tomamos la misma técnica de openStockModal: Buscar por código o por ID de forma flexible
+    const art = DB.getArticles().find(a => String(a.codigo) === String(id) || String(a.id) === String(id));
     editId = id;
+
+    if (!art) {
+        return alert("Error: No se pudo cargar la información del artículo para editar.");
+    }
 
     document.getElementById("modalTitle").textContent = "Editar Artículo";
 
@@ -147,29 +208,108 @@ function editar(id) {
 }
 
 // ---------- GUARDAR ----------
-function guardarArticulo() {
-    const codigo = document.getElementById("cod").value.trim();
-    const nombre = document.getElementById("nom").value.trim();
-    const precio = parseFloat(document.getElementById("pre").value);
-    const stock = parseInt(document.getElementById("sto").value);
+// BUSCA TU FUNCIÓN DE GUARDADO DE EDICIÓN Y REEMPLÁZALA POR COMPLETO:
+function guardarArticulo() { // <-- Asegúrate de usar el nombre de función exacto de tu archivo
+    const codigoIn = document.getElementById("cod").value.trim();
+    const nombreIn = document.getElementById("nom").value.trim();
+    const precioIn = parseFloat(document.getElementById("pre").value || 0);
 
-    if (!codigo || !nombre || isNaN(precio) || isNaN(stock)) {
-        alert("Completa todos los campos correctamente.");
-        return;
+    const listaArticulos = DB.getArticles() || [];
+    
+    // 1. Localizar el artículo original en la base de datos ANTES de ser modificado
+    const articuloOriginal = listaArticulos.find(art => String(art.codigo) === String(editId) || String(art.id) === String(editId));
+    if (!articuloOriginal) {
+        return alert("Error: No se pudo localizar el artículo para procesar la edición.");
     }
 
-    const articulo = {
-        id: editId || crypto.randomUUID(),
-        codigo,
-        nombre,
-        precio,
-        stock
+    if (!nombreIn || !codigoIn) {
+        return alert("Por favor, llena los campos obligatorios.");
+    }
+
+    const timestampActual = new Date().toISOString();
+
+    // Recuperamos de forma totalmente segura el usuario responsable de la terminal activa
+    const sessionData = sessionStorage.getItem('pos_user') || sessionStorage.getItem('pos_cashier');
+    let nombreUsuarioLogueado = "Administrador";
+    if (sessionData) {
+        try {
+            const parsed = JSON.parse(sessionData);
+            nombreUsuarioLogueado = parsed.user || parsed.usuario || nombreUsuarioLogueado;
+        } catch(e) {
+            nombreUsuarioLogueado = sessionData;
+        }
+    }
+
+    // 2. ACTUALIZAR EL ARTÍCULO EN LA LISTA MAESTRA
+    const articulosActualizados = listaArticulos.map(art => {
+        if (String(art.codigo) === String(editId) || String(art.id) === String(editId)) {
+            return {
+                ...art,
+                nombre: nombreIn,
+                precio: precioIn,
+                ultimo_movimiento: timestampActual,
+                usuario_movimiento: nombreUsuarioLogueado
+            };
+        }
+        return art;
+    });
+    DB.saveArticles(articulosActualizados);
+
+    // ========================================================
+    // 🔥 NUEVO BLOQUE CRÍTICO: GENERAR HISTORIAL DE LA EDICIÓN (KARDEX)
+    // ========================================================
+    
+    // Construimos una descripción transparente indicando qué datos específicos se cambiaron
+    let detallesCambio = "Modificación de datos fijos:";
+    if (articuloOriginal.nombre !== nombreIn) {
+        detallesCambio += ` Nombre anterior: "${articuloOriginal.nombre}" -> Nuevo: "${nombreIn}".`;
+    }
+    if (Number(articuloOriginal.precio) !== Number(precioIn)) {
+        detallesCambio += ` Precio anterior: $${articuloOriginal.precio} -> Nuevo: $${precioIn}.`;
+    }
+
+    // Si le dieron guardar pero no alteraron ningún texto, ponemos un motivo genérico de guardado
+    if (detallesCambio === "Modificación de datos fijos:") {
+        detallesCambio = "Se guardó el artículo sin realizar modificaciones en sus campos fijos.";
+    }
+
+    // Recuperamos la bitácora actual del disco duro
+    let historialLog = [];
+    try {
+        historialLog = JSON.parse(localStorage.getItem('pos_inventory_log')) || [];
+    } catch(e) {
+        historialLog = [];
+    }
+
+    // Creamos la nueva estampa de tiempo lineal para auditoría
+    const nuevoRegistroEdicionLog = {
+        id: Date.now().toString(),
+        fecha: timestampActual,
+        usuario: nombreUsuarioLogueado,
+        codigo_articulo: articuloOriginal.codigo,
+        nombre_articulo: nombreIn, // Nombre nuevo actualizado
+        tipo_movimiento: "ajuste_auditoria", // Lo catalogamos como ajuste administrativo
+        cantidad_capturada: 0, // No se movieron piezas físicas en bodega
+        stock_anterior: Number(articuloOriginal.stock || 0),
+        stock_actualizado: Number(articuloOriginal.stock || 0), // El stock se mantiene idéntico
+        motivo: detallesCambio // Guardamos de forma imborrable qué se editó
     };
 
-    DB.saveArticulo(articulo);
-    cerrarModal();
-    cargarCatalogo();
+    historialLog.unshift(nuevoRegistroEdicionLog); // Insertamos al principio del historial
+    
+    // Guardamos con doble candado en el LocalStorage
+    localStorage.setItem('pos_inventory_log', JSON.stringify(historialLog));
+    if (typeof DB.saveInventoryLog === "function") {
+        DB.saveInventoryLog(historialLog);
+    }
+
+    alert("¡Artículo y bitácora de auditoría actualizados correctamente!");
+    
+    // Ocultar modal y refrescar la tabla dinámica en pantalla
+    document.getElementById("modal").classList.add("hidden"); 
+    cargarCatalogo(currentPage); 
 }
+
 
 // ---------- ELIMINAR ----------
 function eliminar(id) {
@@ -549,17 +689,23 @@ function verHistorialArticulo(codigoArticulo) {
             if (opTexto.includes('merma'))     opTexto = "📉 Merma";
 
             const cant = typeof m.cantidad_capturada !== 'undefined' ? m.cantidad_capturada : (m.cantidad_movida || 0);
+            
+            // 🔥 RECUPERACIÓN SEGURA DEL STOCK ANTERIOR RESGUARDADO
+            const stockAnteriorSeguro = typeof m.stock_anterior !== 'undefined' ? m.stock_anterior : '—';
+            const stockFinalSeguro = m.stock_actualizado || m.stock_nuevo || 0;
 
             tr.innerHTML = `
                 <td style="padding: 8px; font-size: 12px; color: #555;">${fecha}</td>
                 <td style="padding: 8px; font-weight: 600;">${m.usuario || '—'}</td>
                 <td style="padding: 8px;"><span style="font-size: 11px;">${opTexto}</span></td>
+                <td style="padding: 8px; text-align: center; color: #666;">${stockAnteriorSeguro}</td>
                 <td style="padding: 8px; text-align: center;">${cant}</td>
-                <td style="padding: 8px; text-align: center; font-weight: bold;">${m.stock_actualizado || m.stock_nuevo || 0}</td>
+                <td style="padding: 8px; text-align: center; font-weight: bold;">${stockFinalSeguro}</td>
                 <td style="padding: 8px; font-style: italic; font-size: 12px; color: #666;">"${m.motivo || '—'}"</td>
             `;
             tbody.appendChild(tr);
         });
+
     }
 
     // 6. Mostrar la modal en el panel de MeetFashion
